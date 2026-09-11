@@ -2,7 +2,8 @@
 # 生長曲線判讀伺服器 — macOS（Mac mini 專用機）一鍵安裝
 #
 #   bash macos-install.sh                 # 裝到 ~/growth，並以 LaunchDaemon 常駐（需 sudo）
-#   bash macos-install.sh --no-daemon     # 只裝不常駐（測試用）
+#   bash macos-install.sh --no-daemon     # 只裝不常駐（遠端 Claude Code 跑這個：不需要 sudo）
+#   sudo bash macos-install.sh --daemon-only  # 只做常駐設定（人自己敲一次，補上 sudo 那段）
 #   bash macos-install.sh --prefix DIR    # 換安裝目錄
 #
 # 可重複執行：已裝的部分會跳過或更新（git pull）。全程不需要 Homebrew：Python 由 uv 下載。
@@ -12,9 +13,11 @@ REPO="https://github.com/med95Albert/clinic-growth-curve"
 PREFIX="$HOME/growth"
 PORT="${PORT:-8790}"
 DAEMON=1
+DAEMON_ONLY=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --no-daemon) DAEMON=0 ;;
+    --daemon-only) DAEMON_ONLY=1 ;;
     --prefix=*) PREFIX="${1#--prefix=}" ;;
     --prefix) shift; PREFIX="${1:?--prefix 需要目錄}" ;;
     *) echo "未知參數：$1" >&2; exit 2 ;;
@@ -29,6 +32,12 @@ LOGDIR="$PREFIX/logs"
 step() { printf '\n== %s ==\n' "$1"; }
 fail() { printf '✗ %s\n' "$1" >&2; exit 1; }
 
+if [ "$DAEMON_ONLY" = "1" ]; then
+  [ -x "$APP/server/.venv/bin/python" ] || fail "找不到 $APP/server/.venv，請先跑不帶 --daemon-only 的安裝"
+  # sudo 執行時 $HOME 會變成 /var/root；用 SUDO_USER 找回真正的安裝者
+  [ -n "${SUDO_USER:-}" ] && PREFIX="$(eval echo "~$SUDO_USER")/growth" && APP="$PREFIX/clinic-growth-curve" && LOGDIR="$PREFIX/logs"
+fi
+if [ "$DAEMON_ONLY" != "1" ]; then
 step "1/6 uv（Python 管理器）"
 if ! command -v uv >/dev/null 2>&1 && [ ! -x "$HOME/.local/bin/uv" ]; then
   curl -LsSf https://astral.sh/uv/install.sh | sh >/dev/null 2>&1 || fail "uv 安裝失敗（需要網路）"
@@ -61,9 +70,10 @@ SYN="$(mktemp -d)/synth"
 .venv/bin/python -m growth_ocr.bench "$SYN" --labels "$SYN/labels.csv" --backend rapidocr 2>&1 | grep -E "每格準確率|沉默錯誤數|每張耗時" || fail "自我測試失敗"
 .venv/bin/python -m growth_ocr.bench "$SYN" --labels "$SYN/labels.csv" --backend rapidocr >/dev/null 2>&1 || fail "自我測試未達標（每格必須 100%、沉默錯誤 0）"
 
+fi  # DAEMON_ONLY
 step "5/6 常駐（LaunchDaemon，開機即啟動、當掉自動重啟）"
 if [ "$DAEMON" = "1" ]; then
-  USER_NAME="$(id -un)"
+  USER_NAME="${SUDO_USER:-$(id -un)}"
   TMP_PLIST="$(mktemp)"
   cat > "$TMP_PLIST" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
