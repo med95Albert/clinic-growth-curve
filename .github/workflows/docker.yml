@@ -12,7 +12,7 @@ name: docker
 on:
   push:
     branches: [main]
-    paths-ignore: ['docs/**', '**/*.md', 'bench/**', 'form/*.html', 'growth-tool/**', 'scripts/**']
+    paths-ignore: ['docs/**', '**/*.md', 'bench/**', 'form/*.html', 'growth-tool/**', 'scripts/**', 'server/deploy/**']
     tags: ["v*"]
   workflow_dispatch:
 

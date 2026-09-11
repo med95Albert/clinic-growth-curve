@@ -58,7 +58,15 @@ python -m growth_ocr.bench out/ --labels out/labels.csv --backend rapidocr
 ```
 細節、環境變數、契約範例見 [server/README.md](server/README.md)。
 
-## 診所電腦一句指令安裝
+## 部署（建議：Mac mini 專用機）
+
+在家一行裝好、手機測完、帶去診所插網路線——見 [server/deploy/MAC-MINI.md](server/deploy/MAC-MINI.md)：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/med95Albert/clinic-growth-curve/main/server/deploy/macos-install.sh | bash
+```
+
+## 或：診所 Windows 電腦一句指令安裝
 
 伺服器裝好 Claude Code 後貼這一句（細節與備援見 [docs/INSTALL-CLAUDE-CODE.md](docs/INSTALL-CLAUDE-CODE.md)）：
 
