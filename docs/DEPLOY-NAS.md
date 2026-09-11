@@ -1,5 +1,11 @@
 # 部署到診所 NAS（Synology Container Manager / Docker）
 
+> ⚠️ **2026-09-11 實測結論：DS420+（Celeron J4025、1.75 GB RAM、swap 已用 690 MB）不適合跑辨識。**
+> 真實照片 175–177 秒、合成表單 260–297 秒，執行緒限制與 SMALL 模型都救不回來（記憶體換頁）。
+> 診所請改用 Windows 電腦（i5-12400 以上、16 GB）跑 `server/deploy/AGENT_DEPLOY.md`。
+> 本文件保留給記憶體 ≥ 4 GB、有 AVX2 的 NAS 或其他 Linux 主機。
+
+
 把判讀伺服器跑在診所的 Synology NAS 上，護理師的手機連 `http://<NAS IP>:8790/` 就能用。
 NAS 24 小時開機、不必額外準備一台電腦，是最省事的一條路線。
 

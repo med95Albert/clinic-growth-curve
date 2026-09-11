@@ -64,7 +64,7 @@ python -m growth_ocr.bench out/ --labels out/labels.csv --backend rapidocr
 
 > 請 clone https://github.com/med95Albert/clinic-growth-curve 到 C:\GrowthCurve，然後完整遵照其中 server/deploy/AGENT_DEPLOY.md 執行安裝與驗收，全程遵守鐵律，最後給我完成報告、手機要開的網址與 QR 頁。
 
-## 或：NAS／Docker
+## 或：NAS／Docker（DS420+ 實測太慢，見文件內結論）
 
 診所如果有 **x86 的 Synology NAS**（DSM 套件中心搜得到 **Container Manager**），可以不用另外準備電腦：
 NAS 24 小時開機，把 `docker-compose.yml` 貼進 Container Manager 的「專案」，或 SSH 進去下一行指令就好。
