@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>同仁操作卡 — 生長曲線建檔</title>
+<style>
+  @page { size: A4 portrait; margin: 12mm; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #f4f4f5; color: #18181b; font-family: -apple-system, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif; }
+  .page { max-width: 760px; margin: 0 auto; padding: 24px 18px 48px; }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  .lead { color: #52525b; margin: 0 0 18px; font-size: 14px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 640px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: #fff; border: 1px solid #d4d4d8; border-radius: 14px; padding: 16px 18px; }
+  .card h2 { font-size: 17px; margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
+  .tag { font-size: 12px; font-weight: 700; color: #fff; background: #1d4ed8; border-radius: 999px; padding: 2px 9px; }
+  .tag.b { background: #15803d; }
+  ol, ul { margin: 0; padding-left: 20px; line-height: 1.75; font-size: 15px; }
+  li b { color: #1d4ed8; }
+  .rule { background: #fffbeb; border: 1.5px solid #f59e0b; color: #78350f; border-radius: 12px; padding: 12px 14px; font-size: 15px; line-height: 1.7; margin-top: 14px; }
+  .rule b { color: #92400e; }
+  .no { background: #fef2f2; border-color: #ef4444; color: #7f1d1d; }
+  .no b { color: #b91c1c; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 6px; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid #e4e4e7; vertical-align: top; }
+  th { color: #52525b; font-weight: 600; width: 42%; }
+  .foot { color: #71717a; font-size: 12px; margin-top: 18px; }
+  .print { float: right; font-size: 13px; color: #1d4ed8; background: none; border: 1px solid #1d4ed8; border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+  @media print { body { background: #fff; } .print { display: none; } .card { break-inside: avoid; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <button class="print" onclick="window.print()">列印這頁</button>
+  <h1>生長曲線建檔　同仁操作卡</h1>
+  <p class="lead">手機圖示「生長曲線建檔」→ 拍照 → 核對 → 開曲線。全程約 30 秒；照片與資料都不會離開診所。</p>
+
+  <div class="grid">
+    <div class="card">
+      <h2><span class="tag">初診</span> 家長填表、你拍照</h2>
+      <ol>
+        <li>櫃檯發<b>填寫單＋板夾（黑色粗筆綁在上面）</b>，寫上病歷號。</li>
+        <li>量完身高體重，<b>你</b>填在最下面「今日量測」列，字寫清楚。</li>
+        <li>紙放進拍攝台的框裡，開手機圖示 → <b>📷 拍照建檔</b>。</li>
+        <li>核對卡出現：<b>黃色欄位一定要看照片確認或補填</b>，白色欄位掃一眼。</li>
+        <li>按<b>「直接開啟曲線」</b>，把曲線給家長／醫師看。</li>
+        <li>看完診：曲線頁下方<b>「複製複診連結」貼進病歷註記</b>，或印 QR 貼兒童手冊。</li>
+      </ol>
+    </div>
+    <div class="card">
+      <h2><span class="tag b">複診</span> 不用填表、不用拍照</h2>
+      <ol>
+        <li>從病歷註記點開連結（或掃兒童手冊上的 QR）→ 舊資料全部自動帶入。</li>
+        <li>按<b>「添加測量數據」</b>，填今天日期、身高、體重 → <b>計算評估結果</b>。</li>
+        <li>看完診再<b>複製一次新連結回病歷</b>（或重印 QR）。</li>
+      </ol>
+      <div class="rule" style="margin-top:12px;">複診是主要動線：<b>只有初診或補病史才需要紙本與拍照</b>。</div>
+    </div>
+  </div>
+
+  <div class="rule">拍照三件事：<b>四個角的黑方塊都要入鏡</b>、<b>紙攤平</b>、<b>不要有手影／反光</b>。用拍攝台就自然做到。</div>
+  <div class="rule no">家長寫錯請<b>整格塗黑重寫</b>；<b>禁用立可白／立可帶</b>（機器讀不到，只會多一格要你補）。請家長用板夾上的黑筆，不要用自己的細字藍筆。</div>
+
+  <div class="card" style="margin-top:14px;">
+    <h2>遇到狀況</h2>
+    <table>
+      <tr><th>「找不到定位塊／請重拍」</th><td>四角黑方塊沒入鏡或紙翹起來，放好重拍。</td></tr>
+      <tr><th>黃色欄位很多</th><td>正常，代表機器不確定；對照上方照片補填即可。連續好幾張都很多 → 檢查燈光與筆。</td></tr>
+      <tr><th>曲線頁說「資料看起來有問題」</th><td>依提示回上方修正（常見：身高體重寫反、日期打錯）；確定沒錯才按「仍要計算」。</td></tr>
+      <tr><th>病歷欄位貼不下連結</th><td>改印 QR 貼紙貼手冊。</td></tr>
+      <tr><th>手機打不開網址</th><td>手機要連員工 Wi-Fi；還是不行找管理者（伺服器可能沒開）。</td></tr>
+    </table>
+  </div>
+
+  <p class="foot">試用期間每一次你在核對卡的修正都會留底，一週後產生準確率報表，用來調整系統——所以<b>看到錯的就改、不確定就補</b>，不用客氣。曲線結果僅供參考，不可取代醫師評估。</p>
+</div>
+</body>
+</html>
