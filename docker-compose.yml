@@ -41,6 +41,14 @@ services:
       PILOT_DIR: ""
       # PILOT_DIR: "/data/pilot"
 
+      # 執行緒數：設成這台機器的實體核心數（DS420+ 是 2）。不設時 onnxruntime 會開很多執行緒
+      # 互相忙等待，在弱 CPU 上可能慢十倍以上。
+      OCR_THREADS: "2"
+
+      # 模型大小：MEDIUM（預設，黃格較少）或 SMALL（快約 1.5 倍、黃格約多一倍、準確率相同）。
+      # 兩組模型都已內建在映像檔，離線可切；辨識太慢時先試 SMALL。
+      # RAPIDOCR_MODEL_TYPE: "SMALL"
+
       # 監聽埠。改的話要跟上面 ports 右邊的數字一起改。
       PORT: "8790"
 

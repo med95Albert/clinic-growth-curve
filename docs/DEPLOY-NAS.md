@@ -145,3 +145,22 @@ docker compose exec growth python -m growth_ocr.pilot_report /data/pilot
 | 「找不到定位塊」 | 四角黑方塊要完整入鏡、紙攤平、避開反光——這是拍照問題，不是 NAS 問題 |
 | 改了表單版面之後讀不出來 | 要重新產生 `form/template.json` 並**重建映像檔**（template 是烤進映像檔的），見 `docs/ARCHITECTURE-v2.md` 附錄 |
 | 想在 NAS 上自己建映像檔 | 不建議（慢、吃記憶體）。真的要的話：把整個 repo 放到 NAS，`docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`，建置過程需要外網 |
+
+## 實際部署踩到的坑（2026-09-11，DS420+）
+
+1. **`/volume1/docker` 一般帳號寫不進去** → 整段用 `sudo sh -c '...'`，並用 `ssh -t` 讓 sudo 能問密碼。
+2. **sudo 的 PATH 沒有 docker** → `export PATH=/usr/local/bin:/var/packages/ContainerManager/target/usr/bin:$PATH`。
+3. **Synology 不會自動建立 bind mount 的資料夾** → 啟動前 `mkdir -p .../pilot && chown 1000:1000 .../pilot`，否則 `Bind mount failed: ... does not exist`。
+4. 第一次呼叫 `/api/ocr` 會載入模型，比之後慢；若每張都要幾十秒以上，先看 `docker stats`（記憶體是否吃滿、換頁）與 `OCR_THREADS` 是否等於核心數，再考慮 `RAPIDOCR_MODEL_TYPE=SMALL`。
+
+從 Mac 一行完成部署（把帳號換成你的 DSM 帳號；會問 SSH 與 sudo 密碼各一次）：
+
+```bash
+ssh -t <DSM帳號>@<NAS IP> "sudo sh -c 'export PATH=/usr/local/bin:/var/packages/ContainerManager/target/usr/bin:\$PATH; mkdir -p /volume1/docker/growth/pilot && chown 1000:1000 /volume1/docker/growth/pilot && cd /volume1/docker/growth && curl -fsSL https://raw.githubusercontent.com/med95Albert/clinic-growth-curve/main/docker-compose.yml -o docker-compose.yml && (docker compose pull; docker compose up -d) && docker ps --filter name=growth-curve'"
+```
+
+診斷一行（CPU／記憶體／容器資源／log）：
+
+```bash
+ssh -t <DSM帳號>@<NAS IP> "sudo sh -c 'export PATH=/usr/local/bin:\$PATH; nproc; grep -m1 \"model name\" /proc/cpuinfo; free -m; docker stats --no-stream growth-curve; docker logs --tail 20 growth-curve'"
+```

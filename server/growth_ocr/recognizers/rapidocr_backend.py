@@ -63,7 +63,18 @@ class RapidOcrRecognizer(Recognizer):
             "PPOCRV6": (OCRVersion.PPOCRV6, ModelType.MEDIUM),
         }
         version, default_model = version_map.get(self.ocr_version, (OCRVersion.PPOCRV6, ModelType.MEDIUM))
-        model = {"MOBILE": ModelType.MOBILE, "MEDIUM": ModelType.MEDIUM}.get(self.model_type, default_model)
+        model = {
+            "MOBILE": ModelType.MOBILE, "MEDIUM": ModelType.MEDIUM,
+            "SMALL": ModelType.SMALL, "TINY": ModelType.TINY,   # v6 的輕量版；NAS 這類弱 CPU 用
+        }.get(self.model_type, default_model)
+        # 執行緒數：onnxruntime 預設開「核心數」條並忙等待，在 2 核心 NAS 上與 OpenCV 互搶會慢百倍；
+        # OCR_THREADS 未設時取 min(4, 核心數)，容器裡建議明確設成核心數。
+        threads = int(os.environ.get("OCR_THREADS") or min(4, os.cpu_count() or 1))
+        try:
+            import cv2
+            cv2.setNumThreads(threads)
+        except Exception:  # pragma: no cover
+            pass
         return RapidOCR(
             params={
                 "Det.ocr_version": version,
@@ -72,6 +83,8 @@ class RapidOcrRecognizer(Recognizer):
                 "Rec.model_type": model,
                 "Rec.rec_img_shape": [3, 48, int(self.rec_width)],
                 "Rec.rec_batch_num": int(self.batch_num),
+                "EngineConfig.onnxruntime.intra_op_num_threads": threads,
+                "EngineConfig.onnxruntime.inter_op_num_threads": 1,
             }
         )
 

@@ -50,6 +50,8 @@ RUN sed '/TEST-ONLY-BELOW/,$d' /tmp/requirements.txt > /tmp/requirements-runtime
 COPY server/growth_ocr /build/growth_ocr
 WORKDIR /build
 RUN python -c "from growth_ocr.recognizers.base import get_recognizer; get_recognizer('rapidocr').warmup()"
+# 再烤一組 v6 SMALL（det 9.5MB + rec 20MB）：弱 CPU 的 NAS 可用 RAPIDOCR_MODEL_TYPE=SMALL 離線切換
+RUN RAPIDOCR_MODEL_TYPE=SMALL python -c "from growth_ocr.recognizers.base import get_recognizer; get_recognizer('rapidocr').warmup()"
 
 # 驗證模型真的在映像檔裡，並把路徑與大小印進建置 log（總量 < 50MB 就當作失敗）
 RUN python -c "import rapidocr,pathlib,sys; d=pathlib.Path(rapidocr.__file__).parent/'models'; fs=sorted(d.glob('*.onnx')); [print(f'{f}  {f.stat().st_size/1048576:.1f} MB') for f in fs]; t=sum(f.stat().st_size for f in fs); print(f'模型合計 {t/1048576:.1f} MB'); sys.exit(0 if t > 50*1048576 else 1)"
