@@ -59,6 +59,7 @@ python run.py                                          # http://0.0.0.0:8790/
 ```
 
 第一次啟動時 rapidocr 會下載 ONNX 模型（約 140MB，之後離線可用）。
+（Docker／NAS 版不會下載——模型在建置映像檔時就抓進去了，見 [`../docs/DEPLOY-NAS.md`](../docs/DEPLOY-NAS.md)。）
 
 手機在同一個 Wi-Fi 開 `http://<伺服器IP>:8790/` 就是原本的 PWA 首頁。
 

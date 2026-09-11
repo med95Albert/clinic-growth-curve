@@ -1,0 +1,18 @@
+# 想在自己的機器上「從原始碼建置」而不是從 GHCR 拉映像檔時用這一份。
+# 它是 docker-compose.yml 的疊加檔，只覆蓋 image／build 兩項，其餘設定沿用主檔。
+#
+#   建置並啟動：
+#     docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+#   之後只要重建：
+#     docker compose -f docker-compose.yml -f docker-compose.build.yml build
+#
+# 注意：建置過程需要外網（pip 抓套件、rapidocr 抓約 140MB 的 ONNX 模型），
+# 而且要在 repo 根目錄執行（build context 是 `.`）。
+# 診所 NAS 通常不該做這件事——NAS 記憶體小、建置很慢，直接 pull 現成映像檔即可。
+
+services:
+  growth:
+    image: clinic-growth-curve:local
+    build:
+      context: .
+      dockerfile: Dockerfile

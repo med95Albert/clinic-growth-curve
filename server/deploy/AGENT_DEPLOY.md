@@ -1,5 +1,8 @@
 # AGENT_DEPLOY — 生長曲線判讀伺服器：診所 Windows 伺服器部署 runbook
 
+> **NAS 路線見 [`docs/DEPLOY-NAS.md`](../../docs/DEPLOY-NAS.md)**：診所若有 x86 的 Synology NAS（套件中心找得到
+> Container Manager），一行 `docker compose up -d` 就跑起來，不用另外準備一台 Windows 電腦。本文件是 Windows 路線。
+
 給現場執行部署的人（或診所伺服器上的 Claude Code）。與「診所照片整理」專案**同一台伺服器、同一套做法**：
 Python 3.12 venv、啟動 .bat、「啟動」資料夾捷徑開機自啟。照片整理專案的 `deploy/AGENT_DEPLOY.md` 疑難排解全部適用。
 

@@ -1,0 +1,109 @@
+# 建置 Docker 映像檔並推到 GHCR，讓診所 NAS 直接 pull、不用在 NAS 上建置。
+#
+# 觸發：推到 main、打 v* 標籤、或在 Actions 頁面手動按。
+# 產出：ghcr.io/med95albert/clinic-growth-curve:latest 與 :sha-<短碼>（打標籤時再加上標籤名）。
+#
+# 第一次跑完之後要做一件事（只做一次）：到 GitHub → 右側 Packages → clinic-growth-curve
+# → Package settings → Change visibility → Public。新建立的 package 預設是 private，
+# 沒改的話 NAS 上 `docker compose pull` 會要求登入（denied / unauthorized）。
+
+name: docker
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+# 同一個分支／標籤連續推好幾次時，只留最新那次，避免排隊重複建置（建一次約 10 分鐘）。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE: ghcr.io/med95albert/clinic-growth-curve
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: 取得原始碼
+        uses: actions/checkout@v4
+
+      # 只有要建 arm64 時才用得到（QEMU 模擬）。留著不會有成本，約 2 秒。
+      - name: 設定 QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: 設定 Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 登入 GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 產生標籤與 labels
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=sha-,format=short
+            type=ref,event=tag
+
+      - name: 建置並推送
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # 只建 amd64。理由：
+          #  1) 目標機器是診所的 Synology x86 機種（Intel/AMD），arm64 用不到。
+          #  2) Synology 入門／ARM 機種根本沒有 Container Manager 套件，建了也裝不了
+          #     （那條路線見 docs/DEPLOY-NAS.md：改用 Windows 伺服器）。
+          #  3) arm64 只能靠 QEMU 模擬，而本映像檔在建置時要跑一次 onnxruntime 推論
+          #     （下載＋預熱模型），模擬下又慢又容易掛，會拖垮整條 workflow。
+          # 套件本身是有 arm64 wheel 的（onnxruntime 1.27.0、opencv-python 5.0.0.93 都有
+          # manylinux aarch64），所以哪天要支援樹莓派之類的機器，把下面這行改成
+          # platforms: linux/amd64,linux/arm64 就好，其餘不用動。
+          platforms: linux/amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          # 不產生 provenance／SBOM attestation：那會讓 manifest 變成 OCI index，
+          # 舊版 Synology Docker 拉這種映像檔容易出錯，GHCR 頁面也會多出 unknown/unknown 的項目。
+          provenance: false
+          sbom: false
+
+      - name: 印出映像檔大小
+        run: |
+          set -euo pipefail
+          docker buildx imagetools inspect "${IMAGE}@${{ steps.build.outputs.digest }}" --raw > /tmp/manifest.json
+          jq -r '[.layers[].size] | add / 1048576 | "壓縮後（registry 上）約 \(. | floor) MB"' /tmp/manifest.json
+          echo "digest: ${{ steps.build.outputs.digest }}"
+          echo "tags:"
+          echo "${{ steps.meta.outputs.tags }}"
+
+      - name: 寫進 job summary
+        if: always()
+        run: |
+          {
+            echo "## 映像檔"
+            echo ""
+            echo '```'
+            echo "${{ steps.meta.outputs.tags }}"
+            echo '```'
+            echo ""
+            echo "NAS 更新指令：\`docker compose pull && docker compose up -d\`"
+          } >> "$GITHUB_STEP_SUMMARY"

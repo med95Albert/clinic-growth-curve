@@ -1,0 +1,59 @@
+# 生長曲線判讀伺服器 — Synology NAS / 任何 Linux 機器
+#
+#   啟動：docker compose up -d
+#   更新：docker compose pull && docker compose up -d
+#   看 log：docker compose logs -f
+#   確認：瀏覽器開 http://<這台機器的 IP>:8790/api/health → {"ok":true,...}
+#
+# Synology Container Manager 的點法見 docs/DEPLOY-NAS.md。
+# 映像檔由 GitHub Actions 建好放在 GHCR，NAS 只負責 pull，不用在 NAS 上建置。
+
+services:
+  growth:
+    image: ghcr.io/med95albert/clinic-growth-curve:latest
+    container_name: growth-curve
+    restart: unless-stopped
+
+    ports:
+      # 主機埠:容器埠。左邊要改（例如 NAS 上 8790 被佔用）就只改左邊，
+      # 右邊 8790 與下面的 PORT 必須一致。
+      - "8790:8790"
+
+    volumes:
+      # 試用留底目錄。預設沒開留底（PILOT_DIR 空著），這個目錄會是空的；
+      # 哪天要開試用模式，資料就落在 compose 檔旁邊的 ./pilot。
+      - ./pilot:/data/pilot
+
+    environment:
+      # 診所區網模式：留空＝不驗證任何請求（護理師不必輸密鑰）。
+      # 只有在這台機器會被對外網開放時才需要設值，設了以後手機要輸入一次同樣的字串。
+      CLINIC_KEY: ""
+
+      # 信心閾值：低於這個值的格子 → 該欄位 null 並在核對卡標黃請護理師確認。
+      # 調高＝更多黃格（安全但麻煩），調低＝可能出現沉默錯誤（讀錯卻沒標黃，醫療風險）。
+      # 依 docs/BENCHMARK.md 實測結果定案，預設 0.85。
+      OCR_CONF_THRESHOLD: "0.85"
+
+      # 試用留底。留空＝關閉，伺服器完全不落地任何照片（平時就該是這樣）。
+      # 試用期間要蒐集 benchmark 資料時，把下面那行的註解拿掉、這行刪掉：
+      #   留底內容＝整張表單照片＋病歷號，等於可識別身分的病歷資料，
+      #   只能留在診所自己的機器上，報表跑完就刪。細節見 server/README.md「試用模式」。
+      PILOT_DIR: ""
+      # PILOT_DIR: "/data/pilot"
+
+      # 監聽埠。改的話要跟上面 ports 右邊的數字一起改。
+      PORT: "8790"
+
+      # 其餘可調參數（平常不用動，說明見 server/README.md）：
+      # OCR_BACKEND: "rapidocr"        # 換 google-vision 要另外給 GOOGLE_VISION_API_KEY（會送雲端，診所情境不建議）
+      # OCR_DEBUG: "1"                 # 設 0 則 API 回應不含 debug.cells
+      # RAPIDOCR_REC_WIDTH: "96"       # 調大更準但慢 4 倍；NAS 上不要調
+      # RAPIDOCR_VERSION: "PPOCRV6"    # ⚠ 改成 PPOCRV5 會在啟動時想去網路抓另一組模型，離線機器會失敗
+
+    # NAS 上若出現 /data/pilot 權限不足（只有開了留底才會遇到）：
+    # 方法 A（建議）：在 NAS 上 `chown -R 1000:1000 ./pilot`
+    # 方法 B：把下面這行的註解拿掉，用 root 跑（比較不安全，但最省事）
+    # user: "0:0"
+
+    # 映像檔內建 HEALTHCHECK（打 /api/health），docker ps 的 STATUS 欄會顯示 healthy。
+    # 第一次啟動要載入 ONNX 模型，NAS 上可能 1～3 分鐘才轉成 healthy，屬正常。

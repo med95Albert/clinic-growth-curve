@@ -11,6 +11,8 @@ fastapi==0.139.2
 uvicorn==0.51.0
 python-multipart==0.0.32
 
-# 測試用（部署可不裝）
+# TEST-ONLY-BELOW —— 以下是測試用，部署可不裝。
+# 根目錄 Dockerfile 會用 sed 從這一行起整段刪掉，做出不含 pytest/httpx 的映像檔。
+# 所以：這行標記不要改，也不要把執行期會用到的套件放到它下面（建置時的 grep 保險絲會擋下來）。
 pytest==9.1.1
 httpx==0.28.1

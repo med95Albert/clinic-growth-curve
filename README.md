@@ -16,6 +16,7 @@ server/        辨識伺服器（FastAPI + growth_ocr）、benchmark、合成表
 docs/          架構、SOP、實測流程
 bench/         真實手寫實測照片與標註（待收集）
 pwa/api/       v1（Vercel＋Anthropic）封存，不再部署
+Dockerfile     容器映像檔（模型已烤在裡面）；docker-compose.yml 給 NAS／Linux 用
 ```
 
 ## 流程
@@ -62,6 +63,24 @@ python -m growth_ocr.bench out/ --labels out/labels.csv --backend rapidocr
 伺服器裝好 Claude Code 後貼這一句（細節與備援見 [docs/INSTALL-CLAUDE-CODE.md](docs/INSTALL-CLAUDE-CODE.md)）：
 
 > 請 clone https://github.com/med95Albert/clinic-growth-curve 到 C:\GrowthCurve，然後完整遵照其中 server/deploy/AGENT_DEPLOY.md 執行安裝與驗收，全程遵守鐵律，最後給我完成報告、手機要開的網址與 QR 頁。
+
+## 或：NAS／Docker
+
+診所如果有 **x86 的 Synology NAS**（DSM 套件中心搜得到 **Container Manager**），可以不用另外準備電腦：
+NAS 24 小時開機，把 `docker-compose.yml` 貼進 Container Manager 的「專案」，或 SSH 進去下一行指令就好。
+
+```bash
+docker compose up -d                      # 啟動（第一次會 pull 映像檔，下載約 0.5GB）
+curl http://<NAS IP>:8790/api/health      # 確認：{"ok":true,"backend":"rapidocr","cells":173}
+docker compose pull && docker compose up -d   # 更新
+```
+
+映像檔由 GitHub Actions 建好推到 `ghcr.io/med95albert/clinic-growth-curve`，**rapidocr 模型已經烤在裡面**，
+NAS 啟動時不需要連外網抓模型。步驟、驗收、留底目錄位置、以及「NAS 沒有 Container Manager 怎麼辦」
+（＝改走上面的 Windows 路線）見 [docs/DEPLOY-NAS.md](docs/DEPLOY-NAS.md)。
+Celeron 等級的 NAS 每張約 3–8 秒，比 i5 電腦慢但可用。
+
+想自己建映像檔：`docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`。
 
 ## 實測與部署
 

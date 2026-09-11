@@ -1,0 +1,50 @@
+# 送進 docker build 的檔案清單（越少越快、也避免把病人資料送進建置環境）。
+# 注意：Docker 的 pattern 只比對「相對於建置環境根目錄的完整路徑」，
+# 所以 *.jpg 只擋得住最上層，要連子目錄一起擋必須另外寫 **/*.jpg。
+
+# --- 病人資料：實拍照片、標註、試用留底，絕不進映像檔 ---
+bench/
+pilot/
+*.jpg
+**/*.jpg
+*.jpeg
+**/*.jpeg
+
+# --- 執行環境與快取 ---
+.venv/
+**/.venv/
+__pycache__/
+**/__pycache__/
+**/*.pyc
+.pytest_cache/
+**/.pytest_cache/
+node_modules/
+**/node_modules/
+.DS_Store
+**/.DS_Store
+
+# --- 映像檔用不到的東西 ---
+.git/
+.gitignore
+.github/
+.claude/
+docs/
+growth-tool/vendor/
+pwa/api/
+pwa/.vercel/
+pwa/package.json
+pwa/vercel.json
+scripts/
+README.md
+Dockerfile
+.dockerignore
+docker-compose.yml
+docker-compose.build.yml
+
+# --- 秘密 ---
+.env
+.env.*
+**/.env
+**/.env.*
+!**/.env.example
+*.lock.tmp
