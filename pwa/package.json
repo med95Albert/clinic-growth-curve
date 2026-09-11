@@ -1,0 +1,11 @@
+{
+  "name": "growth-form-ocr",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "手寫生長曲線表單 → 拍照 → Claude 辨識 → 診間繪圖",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.70.0",
+    "zod": "^3.25.0"
+  }
+}

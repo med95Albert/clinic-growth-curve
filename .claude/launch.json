@@ -1,0 +1,45 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "static",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "python3 -m http.server \"${PORT:-8790}\""
+      ],
+      "port": 8790,
+      "autoPort": true
+    },
+    {
+      "name": "server",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd server && exec \"/Users/albertm1pro/Desktop/AI skill/診所照片整理/dist/repo/clinic-photo-archive/integration/.venv/bin/python\" run.py"
+      ],
+      "port": 8791,
+      "autoPort": true
+    },
+    {
+      "name": "server-auth",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd server && CLINIC_KEY=test-key-1234567890 exec \"/Users/albertm1pro/Desktop/AI skill/診所照片整理/dist/repo/clinic-photo-archive/integration/.venv/bin/python\" run.py"
+      ],
+      "port": 8792,
+      "autoPort": true
+    },
+    {
+      "name": "server-pilot",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd server && PILOT_DIR='/private/tmp/claude-501/-Users-albertm1pro-Desktop-AI-skill-------/66fd3144-9be3-4223-bc4e-27982733b655/scratchpad/pilot' exec \"/Users/albertm1pro/Desktop/AI skill/診所照片整理/dist/repo/clinic-photo-archive/integration/.venv/bin/python\" run.py"
+      ],
+      "port": 8793,
+      "autoPort": true
+    }
+  ]
+}

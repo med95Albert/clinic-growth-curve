@@ -1,0 +1,16 @@
+# 生長曲線表單判讀伺服器（Python 3.12+，純 CPU）
+# 版本為 Mac 開發機實測可用的組合；Windows 部署建議先照這份裝，再視需要 pip freeze 成 requirements.lock。
+
+rapidocr==3.9.1
+onnxruntime==1.27.0
+opencv-python==5.0.0.93
+numpy==2.5.1
+pillow==12.3.0
+
+fastapi==0.139.2
+uvicorn==0.51.0
+python-multipart==0.0.32
+
+# 測試用（部署可不裝）
+pytest==9.1.1
+httpx==0.28.1

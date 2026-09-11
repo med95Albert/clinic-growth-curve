@@ -1,0 +1,2039 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>兒童生長評估計算器（離線版）</title>
+    <!-- 離線版：所有相依套件都在 vendor/，不需要對外連網。 -->
+    <!-- 由 make-local.py 從 Growth_Curve_Tool.html 產生，請勿直接編輯。 -->
+    
+    <!-- React & ReactDOM -->
+    <script src="vendor/react.js"></script>
+    <script src="vendor/react-dom.js"></script>
+    
+    <!-- Babel -->
+    <script src="vendor/babel.min.js"></script>
+    
+    <!-- Chart.js -->
+    <script src="vendor/chart.umd.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="vendor/tailwind.js"></script>
+
+    <!-- html2canvas for screenshot/image export -->
+    <script src="vendor/html2canvas.min.js"></script>
+
+    <!-- qrcode-generator：複診免重填的 QR 貼紙 -->
+    <script src="vendor/qrcode.min.js"></script>
+
+    <style>
+        .chart-container {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 4 / 5;
+            max-height: 900px;
+        }
+        .warning-icon {
+            display: inline-block;
+            margin-left: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+
+// 年齡計算函數
+const calculateAge = (birthDate, measureDate) => {
+    const birth = new Date(birthDate);
+    const measure = new Date(measureDate);
+    
+    let years = measure.getFullYear() - birth.getFullYear();
+    let months = measure.getMonth() - birth.getMonth();
+    
+    if (measure.getDate() < birth.getDate()) {
+        months--;
+    }
+    
+    if (months < 0) {
+        years--;
+        months += 12;
+    }
+    
+    months = months < 0 ? 0 : months;
+    
+    return {
+        years,
+        months,
+        decimalAge: parseFloat((years + (months / 12)).toFixed(2))
+    };
+};
+
+// 日期格式化函數
+const formatDate = (date) => {
+    return new Date(date).toLocaleDateString('zh-TW', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+};
+
+// 數據驗證函數
+const validateMeasurement = (birthDate, measureDate, height, weight) => {
+    if (!birthDate) {
+        throw new Error('請輸入出生日期');
+    }
+
+    if (!measureDate) {
+        throw new Error('請輸入測量日期');
+    }
+
+    const today = new Date();
+    const birthDateObj = new Date(birthDate);
+    const measureDateObj = new Date(measureDate);
+
+    if (birthDateObj > today) {
+        throw new Error('出生日期不能晚於今天');
+    }
+
+    if (measureDateObj > today) {
+        throw new Error('測量日期不能晚於今天');
+    }
+
+    if (measureDateObj < birthDateObj) {
+        throw new Error('測量日期不能早於出生日期');
+    }
+
+    const age = calculateAge(birthDate, measureDate);
+    if (age.years > 18 || (age.years === 18 && age.months > 6)) {
+        throw new Error('年齡不能超過18歲6個月');
+    }
+
+    if (isNaN(height) || height < 30 || height > 200) {
+        throw new Error('請輸入合理的身高數值（30-200公分）');
+    }
+
+    if (isNaN(weight) || weight < 1 || weight > 150) {
+        throw new Error('請輸入合理的體重數值（1-150公斤）');
+    }
+
+    return true;
+};
+
+// 共用的年齡範圍數組
+const ageRanges = [
+    0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9,
+    9.5, 10, 10.5, 11, 11.5, 12, 12.5, 13, 13.5, 14, 14.5, 15, 15.5, 16, 16.5,
+    17, 17.5, 18, 18.5
+];
+
+// 男生生長數據
+const boysData = {
+    height: {
+        p3: [46.3, 63.6, 71.3, 77.2, 82.1, 85.5, 89.1, 92.4, 95.4, 98.4, 101.2,
+             103.9, 106.5, 109.2, 111.8, 114.5, 117.0, 119.5, 121.8, 124.0, 126.0,
+             128.0, 130.5, 133.0, 135.6, 138.2, 141.9, 145.5, 149.3, 153.0, 155.5,
+             158.0, 159.3, 160.5, 160.9, 161.0, 161.5, 162.0],
+        p15: [47.9, 65.4, 73.3, 79.5, 84.6, 88.4, 92.2, 95.7, 99.0, 102.1, 105.2,
+              107.9, 110.5, 113.2, 115.8, 118.5, 121.3, 124.0, 126.0, 128.0, 130.5,
+              133.0, 135.6, 138.1, 141.1, 144.0, 148.5, 153.0, 156.3, 159.6, 161.3,
+              163.0, 164.0, 165.0, 165.5, 166.0, 166.0, 166.0],
+        p50: [49.9, 67.6, 75.7, 82.3, 87.8, 91.9, 96.1, 99.9, 103.5, 106.7, 110.0,
+              112.8, 115.6, 118.4, 121.2, 124.0, 126.8, 129.5, 131.8, 134.0, 136.5,
+              139.0, 142.0, 145.0, 148.8, 152.5, 156.9, 161.2, 163.7, 166.2, 167.6,
+              169.0, 170.0, 171.0, 171.5, 172.0, 172.0, 172.0],
+        p85: [51.8, 69.8, 78.2, 85.1, 91.0, 95.5, 99.9, 104.0, 107.7, 111.2, 114.8,
+              117.7, 120.6, 123.6, 126.5, 129.4, 132.2, 135.0, 137.5, 140.0, 142.8,
+              145.5, 149.4, 153.2, 157.1, 161.0, 164.9, 168.7, 170.8, 172.8, 173.9,
+              175.0, 175.8, 176.5, 176.8, 177.0, 177.3, 177.5],
+        p97: [53.4, 71.6, 80.2, 87.3, 93.6, 98.3, 103.1, 107.3, 111.2, 115.0, 118.7,
+              121.8, 124.9, 128.1, 131.2, 134.3, 137.2, 140.0, 142.5, 145.0, 148.3,
+              151.5, 156.1, 160.7, 164.4, 168.0, 171.0, 174.0, 176.0, 178.0, 179.0,
+              180.0, 180.5, 181.0, 181.5, 182.0, 182.0, 182.0]
+    },
+    weight: {
+        p3: [2.5, 6.4, 7.8, 8.9, 9.8, 10.7, 11.4, 12.2, 12.9, 13.6, 14.3, 15.3,
+             16.3, 17.4, 18.4, 19.4, 20.3, 21.2, 22.1, 23.0, 24.0, 25.0, 26.3,
+             27.6, 29.3, 30.5, 32.8, 35.0, 38.0, 41.0, 43.0, 45.0, 46.8, 48.5,
+             49.3, 50.0, 50.3, 50.5],
+        p15: [2.9, 7.1, 8.6, 9.7, 10.8, 11.8, 12.7, 13.5, 14.3, 15.2, 16.0, 17.1,
+              18.2, 19.3, 20.4, 21.5, 22.7, 23.8, 24.8, 25.8, 26.9, 28.0, 29.6,
+              31.2, 33.1, 35.0, 38.0, 41.0, 44.0, 47.0, 49.0, 51.0, 52.0, 53.0,
+              54.0, 55.0, 55.0, 55.0],
+        p50: [3.3, 7.9, 9.6, 10.9, 12.2, 13.3, 14.3, 15.3, 16.3, 17.3, 18.3, 19.6,
+              20.9, 22.3, 23.6, 24.9, 26.3, 27.6, 28.8, 30.0, 31.5, 33.0, 35.3,
+              37.6, 40.3, 43.0, 46.5, 50.0, 52.5, 54.9, 56.5, 58.0, 59.0, 60.0,
+              61.0, 62.0, 62.5, 63.0],
+        p85: [3.9, 8.9, 10.8, 12.3, 13.7, 15.0, 16.3, 17.5, 18.7, 19.9, 21.1, 22.9,
+              24.7, 26.4, 28.2, 30.0, 32.2, 34.3, 35.7, 37.0, 39.4, 41.8, 44.7,
+              47.5, 50.4, 53.2, 56.8, 60.4, 62.7, 65.0, 66.5, 68.0, 69.0, 70.0,
+              70.0, 70.0, 70.5, 71.0],
+        p97: [4.3, 9.7, 11.8, 13.5, 15.1, 16.6, 18.0, 19.4, 20.9, 22.3, 23.8, 26.5,
+              29.2, 32.0, 34.7, 37.4, 40.2, 42.3, 44.3, 45.6, 48.6, 51.6, 54.8,
+              58.0, 61.5, 65.0, 68.5, 72.0, 74.3, 76.6, 77.6, 78.5, 79.3, 80.0,
+              80.0, 80.0, 80.0, 80.0]
+    },
+    bmi: {
+        p3: [11.1, 14.3, 14.5, 14.6, 14.4, 14.1, 13.8, 13.6, 13.4, 13.2, 13.2, 13.2,
+             13.3, 13.5, 13.7, 13.9, 14.2, 14.5, 14.8, 15.1, 15.3, 15.6, 15.8, 16.0,
+             16.2, 16.4, 16.5, 16.7, 16.9, 17.1, 17.3, 17.5, 17.7, 17.9, 18.1, 18.3,
+             18.5, 18.7],
+        p15: [11.6, 15.0, 15.3, 15.4, 15.2, 14.9, 14.6, 14.4, 14.2, 14.0, 14.0, 14.0,
+              14.1, 14.3, 14.5, 14.8, 15.1, 15.4, 15.7, 16.0, 16.3, 16.6, 16.8, 17.0,
+              17.3, 17.5, 17.7, 17.9, 18.1, 18.3, 18.5, 18.7, 18.9, 19.1, 19.3, 19.5,
+              19.7, 19.9],
+        p50: [12.8, 16.5, 16.9, 17.0, 16.7, 16.3, 15.9, 15.6, 15.3, 15.1, 15.1, 15.1,
+              15.3, 15.5, 15.8, 16.1, 16.4, 16.8, 17.2, 17.5, 17.9, 18.2, 18.5, 18.8,
+              19.1, 19.4, 19.7, 20.0, 20.3, 20.6, 20.9, 21.2, 21.5, 21.8, 22.1, 22.4,
+              22.7, 23.0],
+        p85: [14.0, 17.9, 18.5, 18.6, 18.2, 17.7, 17.2, 16.8, 16.5, 16.3, 16.2, 16.3,
+              16.4, 16.7, 17.1, 17.5, 17.9, 18.4, 18.9, 19.3, 19.7, 20.1, 20.5, 20.9,
+              21.3, 21.7, 22.1, 22.5, 22.9, 23.3, 23.7, 24.1, 24.5, 24.9, 25.3, 25.7,
+              26.1, 26.5],
+        p97: [15.2, 19.4, 20.2, 20.2, 19.7, 19.1, 18.5, 18.1, 17.7, 17.5, 17.4, 17.5,
+              17.7, 18.0, 18.5, 19.0, 19.6, 20.2, 20.8, 21.3, 21.8, 22.3, 22.8, 23.3,
+              23.8, 24.3, 24.8, 25.3, 25.8, 26.3, 26.8, 27.3, 27.8, 28.3, 28.8, 29.3,
+              29.8, 30.3]
+    }
+};
+
+// 女生生長數據
+const girlsData = {
+    height: {
+        p3: [45.6, 61.5, 69.2, 75.2, 80.3, 84.0, 87.9, 91.4, 94.6, 97.6, 100.5,
+             103.0, 105.5, 108.1, 110.6, 113.1, 115.7, 118.3, 120.7, 123.0, 125.8,
+             128.5, 131.8, 135.0, 137.9, 140.8, 143.2, 145.5, 146.8, 148.0, 148.5,
+             149.0, 149.5, 150.0, 150.0, 150.0, 150.0, 150.0],
+        p15: [47.2, 63.4, 71.3, 77.7, 83.1, 87.0, 91.1, 94.8, 98.3, 101.5, 104.5,
+              107.1, 109.7, 112.3, 114.9, 117.5, 120.3, 123.0, 125.5, 128.0, 131.0,
+              134.0, 137.5, 141.0, 143.8, 146.5, 148.5, 150.5, 151.3, 152.0, 152.5,
+              153.0, 153.5, 154.0, 154.0, 154.0, 154.0, 154.0],
+        p50: [49.1, 65.7, 74.0, 80.7, 86.4, 90.7, 95.1, 99.0, 102.7, 106.2, 109.4,
+              112.1, 114.8, 117.6, 120.3, 123.0, 125.8, 128.5, 131.3, 134.0, 137.5,
+              141.0, 144.5, 148.0, 150.5, 153.0, 154.5, 156.0, 156.8, 157.5, 157.9,
+              158.3, 158.7, 159.0, 159.3, 159.5, 159.5, 159.5],
+        p85: [51.1, 68.1, 76.7, 83.7, 89.8, 94.3, 99.0, 103.3, 107.2, 110.9, 114.4,
+              117.1, 119.9, 122.6, 125.4, 128.1, 131.3, 134.5, 137.8, 141.0, 144.8,
+              148.5, 151.8, 155.0, 157.0, 159.0, 160.3, 161.5, 162.3, 163.0, 163.5,
+              164.0, 164.2, 164.4, 164.7, 165.0, 165.0, 165.0],
+        p97: [52.7, 70.0, 78.9, 86.2, 92.5, 97.3, 102.2, 106.7, 110.8, 114.7, 118.4,
+              121.3, 124.2, 127.2, 130.1, 133.0, 136.5, 140.0, 143.5, 147.0, 150.8,
+              154.5, 157.3, 160.0, 161.8, 163.5, 164.8, 166.0, 167.0, 167.9, 168.2,
+              168.5, 168.8, 169.0, 169.0, 169.0, 169.0, 169.0]
+    },
+    weight: {
+        p3: [2.4, 5.8, 7.1, 8.2, 9.2, 10.1, 11.0, 11.8, 12.5, 13.2, 14.0, 14.9,
+             15.9, 16.8, 17.8, 18.7, 19.6, 20.4, 21.5, 22.5, 23.8, 25.0, 26.5,
+             28.0, 29.8, 31.5, 33.5, 35.5, 37.1, 38.6, 39.3, 40.0, 40.5, 41.0,
+             41.5, 42.0, 42.0, 42.0],
+        p15: [2.8, 6.5, 7.9, 9.1, 10.2, 11.2, 12.2, 13.1, 13.9, 14.7, 15.5, 16.6,
+              17.6, 18.7, 19.7, 20.8, 21.8, 22.8, 24.0, 25.2, 26.8, 28.3, 30.0,
+              31.6, 33.7, 35.7, 38.0, 40.2, 41.9, 43.5, 44.3, 45.0, 45.5, 46.0,
+              46.3, 46.5, 46.5, 46.5],
+        p50: [3.2, 7.4, 9.0, 10.4, 11.7, 12.9, 14.0, 15.1, 16.2, 17.2, 18.2, 19.7,
+              21.1, 22.5, 23.9, 25.3, 26.6, 28.0, 29.8, 31.5, 33.8, 36.0, 38.3,
+              40.5, 43.3, 46.0, 48.8, 51.5, 53.2, 54.8, 55.5, 56.2, 56.5, 56.8,
+              57.0, 57.2, 57.2, 57.2],
+        p85: [3.7, 8.5, 10.4, 11.9, 13.4, 14.8, 16.2, 17.5, 18.9, 20.2, 21.5, 23.7,
+              25.8, 28.0, 30.1, 32.2, 34.2, 36.2, 38.7, 41.1, 43.8, 46.4, 49.0,
+              51.6, 54.8, 57.9, 60.8, 63.6, 65.3, 67.0, 67.8, 68.5, 68.9, 69.3,
+              69.5, 69.7, 69.7, 69.7],
+        p97: [4.2, 9.5, 11.7, 13.5, 15.2, 16.8, 18.4, 20.0, 21.6, 23.2, 24.8, 27.8,
+              30.8, 33.7, 36.7, 39.6, 42.2, 44.7, 47.8, 50.8, 53.9, 56.9, 59.9,
+              62.8, 66.5, 70.1, 73.4, 76.6, 78.5, 80.3, 81.0, 81.7, 82.1, 82.5,
+              82.7, 83.0, 83.0, 83.0]
+    },
+    bmi: {
+        p3: [10.8, 13.9, 14.2, 14.3, 14.1, 13.8, 13.5, 13.3, 13.1, 12.9, 12.9, 12.9,
+             13.0, 13.2, 13.4, 13.6, 13.9, 14.2, 14.5, 14.8, 15.0, 15.3, 15.5, 15.7,
+             15.9, 16.1, 16.3, 16.5, 16.7, 16.9, 17.1, 17.3, 17.5, 17.7, 17.9, 18.1,
+             18.3, 18.5],
+        p15: [11.3, 14.6, 15.0, 15.1, 14.9, 14.6, 14.3, 14.1, 13.9, 13.7, 13.7, 13.7,
+              13.8, 14.0, 14.2, 14.5, 14.8, 15.1, 15.4, 15.7, 16.0, 16.3, 16.5, 16.7,
+              17.0, 17.2, 17.4, 17.6, 17.8, 18.0, 18.2, 18.4, 18.6, 18.8, 19.0, 19.2,
+              19.4, 19.6],
+        p50: [12.4, 16.1, 16.5, 16.6, 16.3, 15.9, 15.5, 15.2, 14.9, 14.7, 14.7, 14.7,
+              14.9, 15.1, 15.4, 15.7, 16.0, 16.4, 16.8, 17.2, 17.5, 17.9, 18.2, 18.5,
+              18.8, 19.1, 19.4, 19.7, 20.0, 20.3, 20.6, 20.9, 21.2, 21.5, 21.8, 22.1,
+              22.4, 22.7],
+        p85: [13.5, 17.6, 18.1, 18.2, 17.8, 17.3, 16.8, 16.4, 16.1, 15.9, 15.8, 15.9,
+              16.0, 16.3, 16.7, 17.1, 17.5, 18.0, 18.5, 19.0, 19.4, 19.9, 20.3, 20.7,
+              21.1, 21.5, 21.9, 22.3, 22.7, 23.1, 23.5, 23.9, 24.3, 24.7, 25.1, 25.5,
+              25.9, 26.3],
+        p97: [14.7, 19.1, 19.8, 19.8, 19.3, 18.7, 18.1, 17.7, 17.3, 17.1, 17.0, 17.1,
+              17.3, 17.6, 18.1, 18.6, 19.2, 19.8, 20.4, 21.0, 21.5, 22.0, 22.5, 23.0,
+              23.5, 24.0, 24.5, 25.0, 25.5, 26.0, 26.5, 27.0, 27.5, 28.0, 28.5, 29.0,
+              29.5, 30.0]
+    }
+};
+
+// 計算百分位函數
+const calculatePercentile = (value, age, type, gender) => {
+    const data = gender === 'male' ? boysData : girlsData;
+    const percentileData = data[type];
+    
+    let ageIndex = ageRanges.findIndex(a => a >= age);
+    if (ageIndex === -1) ageIndex = ageRanges.length - 1;
+    if (ageIndex === 0) ageIndex = 1;
+    
+    const age1 = ageRanges[ageIndex - 1];
+    const age2 = ageRanges[ageIndex];
+    const ageFraction = (age - age1) / (age2 - age1);
+    
+    const interpolate = (data1, data2) => {
+        return data1 + (data2 - data1) * ageFraction;
+    };
+    
+    const p3 = interpolate(percentileData.p3[ageIndex - 1], percentileData.p3[ageIndex]);
+    const p15 = interpolate(percentileData.p15[ageIndex - 1], percentileData.p15[ageIndex]);
+    const p50 = interpolate(percentileData.p50[ageIndex - 1], percentileData.p50[ageIndex]);
+    const p85 = interpolate(percentileData.p85[ageIndex - 1], percentileData.p85[ageIndex]);
+    const p97 = interpolate(percentileData.p97[ageIndex - 1], percentileData.p97[ageIndex]);
+    
+    if (value < p3) return { percentile: '<3%', value: 3, label: '偏低' };
+    if (value < p15) return { percentile: '3-15%', value: 9, label: '略低' };
+    if (value < p85) return { percentile: '15-85%', value: 50, label: '正常' };
+    if (value < p97) return { percentile: '85-97%', value: 91, label: '略高' };
+    return { percentile: '>97%', value: 97, label: '偏高' };
+};
+
+// 反向計算：根據身高值找出對應的百分位數值（用於基因身高）
+const calculatePercentileValue = (targetHeight, age, gender) => {
+    const data = gender === 'male' ? boysData : girlsData;
+    const heightData = data.height;
+    
+    let ageIndex = ageRanges.findIndex(a => a >= age);
+    if (ageIndex === -1) ageIndex = ageRanges.length - 1;
+    if (ageIndex === 0) ageIndex = 1;
+    
+    const age1 = ageRanges[ageIndex - 1];
+    const age2 = ageRanges[ageIndex];
+    const ageFraction = (age - age1) / (age2 - age1);
+    
+    const interpolate = (data1, data2) => {
+        return data1 + (data2 - data1) * ageFraction;
+    };
+    
+    const p3 = interpolate(heightData.p3[ageIndex - 1], heightData.p3[ageIndex]);
+    const p15 = interpolate(heightData.p15[ageIndex - 1], heightData.p15[ageIndex]);
+    const p50 = interpolate(heightData.p50[ageIndex - 1], heightData.p50[ageIndex]);
+    const p85 = interpolate(heightData.p85[ageIndex - 1], heightData.p85[ageIndex]);
+    const p97 = interpolate(heightData.p97[ageIndex - 1], heightData.p97[ageIndex]);
+    
+    // 根據目標身高落在哪個區間，線性插值計算百分位數值
+    if (targetHeight <= p3) {
+        return 3;
+    } else if (targetHeight <= p15) {
+        return 3 + (targetHeight - p3) / (p15 - p3) * 12;
+    } else if (targetHeight <= p50) {
+        return 15 + (targetHeight - p15) / (p50 - p15) * 35;
+    } else if (targetHeight <= p85) {
+        return 50 + (targetHeight - p50) / (p85 - p50) * 35;
+    } else if (targetHeight <= p97) {
+        return 85 + (targetHeight - p85) / (p97 - p85) * 12;
+    } else {
+        return 97;
+    }
+};
+
+// 根據百分位數值生成整條身高曲線
+const generateHeightCurveByPercentile = (percentileValue, gender) => {
+    const data = gender === 'male' ? boysData : girlsData;
+    const heightData = data.height;
+    
+    return ageRanges.map((age, index) => {
+        const p3 = heightData.p3[index];
+        const p15 = heightData.p15[index];
+        const p50 = heightData.p50[index];
+        const p85 = heightData.p85[index];
+        const p97 = heightData.p97[index];
+        
+        let height;
+        if (percentileValue <= 3) {
+            height = p3;
+        } else if (percentileValue <= 15) {
+            height = p3 + (p15 - p3) * (percentileValue - 3) / 12;
+        } else if (percentileValue <= 50) {
+            height = p15 + (p50 - p15) * (percentileValue - 15) / 35;
+        } else if (percentileValue <= 85) {
+            height = p50 + (p85 - p50) * (percentileValue - 50) / 35;
+        } else if (percentileValue <= 97) {
+            height = p85 + (p97 - p85) * (percentileValue - 85) / 12;
+        } else {
+            height = p97;
+        }
+        
+        return { x: age, y: height };
+    });
+};
+
+// ===== 統計工具函數：百分位 ↔ z-score =====
+
+// 百分位 → z-score（Inverse Normal CDF, Peter Acklam 近似法）
+const percentileToZscore = (pPercent) => {
+    const p = Math.max(0.001, Math.min(0.999, pPercent / 100));
+    const a = [-3.969683028665376e+01, 2.209460984245205e+02,
+               -2.759285104469687e+02, 1.383577518672690e+02,
+               -3.066479806614716e+01, 2.506628277459239e+00];
+    const b = [-5.447609879822406e+01, 1.615858368580409e+02,
+               -1.556989798598866e+02, 6.680131188771972e+01,
+               -1.328068155288572e+01];
+    const c = [-7.784894002430293e-03, -3.223964580411365e-01,
+               -2.400758277161838e+00, -2.549732539343734e+00,
+                4.374664141464968e+00, 2.938163982698783e+00];
+    const d = [7.784695709041462e-03, 3.224671290700398e-01,
+               2.445134137142996e+00, 3.754408661907416e+00];
+    const pLow = 0.02425;
+    const pHigh = 1 - pLow;
+    let q, r;
+    if (p < pLow) {
+        q = Math.sqrt(-2 * Math.log(p));
+        return (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) /
+               ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);
+    } else if (p <= pHigh) {
+        q = p - 0.5;
+        r = q * q;
+        return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q /
+               (((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1);
+    } else {
+        q = Math.sqrt(-2 * Math.log(1 - p));
+        return -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) /
+                ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);
+    }
+};
+
+// z-score → 百分位（Normal CDF, Horner 近似法）
+const zscoreToPercentile = (z) => {
+    const t = 1 / (1 + 0.2316419 * Math.abs(z));
+    const d = 0.3989422804014327; // 1/sqrt(2*pi)
+    const p = d * Math.exp(-z * z / 2) *
+              (t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274)))));
+    return (z > 0 ? (1 - p) : p) * 100;
+};
+
+// 計算 BMI
+const calculateBMI = (weight, height) => {
+    const heightInMeters = height / 100;
+    return parseFloat((weight / (heightInMeters * heightInMeters)).toFixed(1));
+};
+
+// 檢測異常
+const detectAbnormalities = (measurements, gender, geneticHeightPercentile = null) => {
+    const warnings = [];
+    
+    measurements.forEach((measurement, index) => {
+        const issues = [];
+        
+        // 檢查身高百分位
+        if (measurement.heightPercentile.value <= 3 || measurement.heightPercentile.value >= 97) {
+            issues.push({
+                type: 'height_percentile',
+                severity: 'error',
+                message: `身高${measurement.heightPercentile.percentile}，需注意`
+            });
+        }
+        
+        // 檢查體重百分位
+        if (measurement.weightPercentile.value <= 3 || measurement.weightPercentile.value >= 97) {
+            issues.push({
+                type: 'weight_percentile',
+                severity: 'error',
+                message: `體重${measurement.weightPercentile.percentile}，需注意`
+            });
+        }
+        
+        // 檢查 BMI
+        if (measurement.bmiPercentile.value >= 97) {
+            issues.push({
+                type: 'bmi',
+                severity: 'error',
+                message: '肥胖：過重與肥胖會增加慢性病風險，也會有成年時期長不高的風險'
+            });
+        } else if (measurement.bmiPercentile.value >= 85) {
+            issues.push({
+                type: 'bmi',
+                severity: 'warning',
+                message: '過重：過重與肥胖會增加慢性病風險，也會有成年時期長不高的風險'
+            });
+        }
+        
+        // 檢查基因身高偏差（如果有基因身高資料）
+        if (geneticHeightPercentile !== null) {
+            const heightPercentileDiff = Math.abs(measurement.heightPercentile.value - geneticHeightPercentile);
+            
+            if (heightPercentileDiff > 18) {
+                const direction = measurement.heightPercentile.value > geneticHeightPercentile ? '高於' : '低於';
+                issues.push({
+                    type: 'genetic_deviation',
+                    severity: 'warning',
+                    message: `實際身高百分位${direction}基因預期${heightPercentileDiff.toFixed(1)}%（超過1個標準差），建議評估`
+                });
+            }
+        }
+        
+        // 檢查生長速度（需要至少兩個測量點）
+        if (index > 0) {
+            const prevMeasurement = measurements[index - 1];
+            const timeDiff = measurement.age - prevMeasurement.age;
+            const heightGrowth = measurement.height - prevMeasurement.height;
+            const growthRate = heightGrowth / timeDiff;
+            
+            // 每年生長速度 < 4cm
+            if (growthRate < 4) {
+                issues.push({
+                    type: 'growth_rate',
+                    severity: 'error',
+                    message: `生長速度過慢（${growthRate.toFixed(1)}公分/年），需注意`
+                });
+            }
+            
+            // 青春期前生長過快（需要4歲以後才檢查）
+            const isPrepubertal = (gender === 'male' && measurement.age < 12) || 
+                                  (gender === 'female' && measurement.age < 10);
+            const isOver4YearsOld = measurement.age >= 4;
+            
+            if (isPrepubertal && isOver4YearsOld && growthRate > 6) {
+                issues.push({
+                    type: 'growth_rate',
+                    severity: 'warning',
+                    message: `青春期前生長過快（${growthRate.toFixed(1)}公分/年），建議評估`
+                });
+            }
+        }
+        
+        if (issues.length > 0) {
+            warnings.push({
+                index,
+                measureDate: measurement.measureDate,
+                displayAge: measurement.displayAge,
+                issues
+            });
+        }
+    });
+    
+    return warnings;
+};
+
+// 創建圖表數據
+const createChartData = (type, gender, geneticHeightCurve = null) => {
+    const data = gender === 'male' ? boysData : girlsData;
+    
+    // 將所有數據轉換為 {x, y} 格式
+    const convertToXY = (dataArray) => {
+        return ageRanges.map((age, index) => ({ x: age, y: dataArray[index] }));
+    };
+    
+    const datasets = [
+        {
+            label: '3%',
+            data: convertToXY(data[type].p3),
+            borderColor: 'rgb(0, 0, 0)',  // 黑色
+            backgroundColor: 'transparent',
+            borderWidth: 2,
+            pointRadius: 0,
+            showLine: true
+        },
+        {
+            label: '15%',
+            data: convertToXY(data[type].p15),
+            borderColor: 'rgba(255, 159, 64, 0.6)',  // 橙色
+            backgroundColor: 'transparent',
+            borderWidth: 1,
+            pointRadius: 0,
+            showLine: true
+        },
+        {
+            label: '50%',
+            data: convertToXY(data[type].p50),
+            borderColor: 'rgb(34, 197, 94)',  // 綠色
+            backgroundColor: 'transparent',
+            borderWidth: 2,
+            pointRadius: 0,
+            showLine: true
+        },
+        {
+            label: '85%',
+            data: convertToXY(data[type].p85),
+            borderColor: 'rgb(234, 179, 8)',  // 黃色
+            backgroundColor: 'transparent',
+            borderWidth: 2,
+            pointRadius: 0,
+            showLine: true
+        },
+        {
+            label: '97%',
+            data: convertToXY(data[type].p97),
+            borderColor: 'rgb(239, 68, 68)',  // 紅色
+            backgroundColor: 'transparent',
+            borderWidth: 2,
+            pointRadius: 0,
+            showLine: true
+        }
+    ];
+    
+    // 如果是身高圖表且有基因身高曲線，添加基因身高曲線 + ±1SD 範圍帶
+    if (type === 'height' && geneticHeightCurve) {
+        // ±1 SD 上界
+        if (geneticHeightCurve._upper && geneticHeightCurve._lower) {
+            const upperData = geneticHeightCurve._upper;
+            const lowerData = geneticHeightCurve._lower;
+
+            // 上界線（fill down to 下界線，形成淡藍色範圍帶）
+            datasets.push({
+                label: '基因預期範圍 (±1SD)',
+                data: upperData,
+                borderColor: 'rgba(147, 197, 253, 0.4)',
+                backgroundColor: 'rgba(147, 197, 253, 0.15)',
+                borderWidth: 1,
+                borderDash: [4, 4],
+                pointRadius: 0,
+                showLine: true,
+                fill: '+2'  // 填滿到往後第 2 個 dataset（下界線）
+            });
+        }
+
+        // 中間值（藍色虛線）
+        datasets.push({
+            label: '基因預期身高',
+            data: geneticHeightCurve,
+            borderColor: 'rgba(59, 130, 246, 0.7)',
+            backgroundColor: 'transparent',
+            borderWidth: 2,
+            borderDash: [10, 5],
+            pointRadius: 0,
+            showLine: true
+        });
+
+        // ±1 SD 下界線
+        if (geneticHeightCurve._lower) {
+            datasets.push({
+                label: '_genetic_lower',  // 隱藏 label
+                data: geneticHeightCurve._lower,
+                borderColor: 'rgba(147, 197, 253, 0.4)',
+                backgroundColor: 'transparent',
+                borderWidth: 1,
+                borderDash: [4, 4],
+                pointRadius: 0,
+                showLine: true
+            });
+        }
+    }
+    
+    return { datasets };
+};
+
+// 測量輸入組件
+const MeasurementInput = ({ data, index, onChange, onRemove, isRemovable }) => (
+    <div className="p-4 border rounded-lg bg-gray-50">
+        <div className="flex justify-between items-center mb-3">
+            <h3 className="font-medium">測量數據 {index + 1}</h3>
+            {isRemovable && (
+                <button
+                    type="button"
+                    onClick={onRemove}
+                    className="text-red-600 hover:text-red-800 text-sm"
+                >
+                    刪除
+                </button>
+            )}
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <label className="block text-sm font-medium mb-1">測量日期：</label>
+                <input
+                    type="date"
+                    value={data.measureDate}
+                    onChange={(e) => onChange('measureDate', e.target.value)}
+                    className="w-full p-2 border rounded"
+                    required
+                />
+            </div>
+            <div>
+                <label className="block text-sm font-medium mb-1">身高 (cm)：</label>
+                <input
+                    type="number"
+                    step="0.1"
+                    value={data.height}
+                    onChange={(e) => onChange('height', e.target.value)}
+                    className="w-full p-2 border rounded"
+                    required
+                />
+            </div>
+            <div>
+                <label className="block text-sm font-medium mb-1">體重 (kg)：</label>
+                <input
+                    type="number"
+                    step="0.1"
+                    value={data.weight}
+                    onChange={(e) => onChange('weight', e.target.value)}
+                    className="w-full p-2 border rounded"
+                    required
+                />
+            </div>
+        </div>
+    </div>
+);
+
+// 結果表格組件
+const ResultsTable = ({ results, warnings }) => {
+    const getWarningsForIndex = (index) => {
+        const warning = warnings.find(w => w.index === index);
+        return warning ? warning.issues : [];
+    };
+    
+    const hasError = (index) => {
+        const issues = getWarningsForIndex(index);
+        return issues.some(issue => issue.severity === 'error');
+    };
+    
+    return (
+        <div className="overflow-x-auto">
+            <table className="w-full border-collapse border">
+                <thead className="bg-gray-100">
+                    <tr>
+                        <th className="border p-2">測量日期</th>
+                        <th className="border p-2">年齡</th>
+                        <th className="border p-2">身高 (cm)</th>
+                        <th className="border p-2">身高百分位</th>
+                        <th className="border p-2">體重 (kg)</th>
+                        <th className="border p-2">體重百分位</th>
+                        <th className="border p-2">BMI</th>
+                        <th className="border p-2">BMI百分位</th>
+                        <th className="border p-2">警示<br/><span className="text-xs font-normal text-gray-600">僅供參考，不可取代醫師評估</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {results.measurements.map((m, index) => {
+                        const issues = getWarningsForIndex(index);
+                        const rowClass = hasError(index) ? 'bg-red-50' : '';
+                        
+                        return (
+                            <tr key={index} className={rowClass}>
+                                <td className="border p-2">{formatDate(m.measureDate)}</td>
+                                <td className="border p-2">{m.displayAge}</td>
+                                <td className="border p-2 font-medium">{m.height}</td>
+                                <td className="border p-2">
+                                    <span className={
+                                        m.heightPercentile.value <= 3 || m.heightPercentile.value >= 97
+                                            ? 'text-red-600 font-bold'
+                                            : ''
+                                    }>
+                                        {m.heightPercentile.percentile} ({m.heightPercentile.label})
+                                    </span>
+                                </td>
+                                <td className="border p-2 font-medium">{m.weight}</td>
+                                <td className="border p-2">
+                                    <span className={
+                                        m.weightPercentile.value <= 3 || m.weightPercentile.value >= 97
+                                            ? 'text-red-600 font-bold'
+                                            : ''
+                                    }>
+                                        {m.weightPercentile.percentile} ({m.weightPercentile.label})
+                                    </span>
+                                </td>
+                                <td className="border p-2 font-medium">{m.bmi}</td>
+                                <td className="border p-2">
+                                    <span className={
+                                        m.bmiPercentile.value >= 85
+                                            ? 'text-red-600 font-bold'
+                                            : ''
+                                    }>
+                                        {m.bmiPercentile.percentile} ({m.bmiPercentile.label})
+                                    </span>
+                                </td>
+                                <td className="border p-2">
+                                    {issues.length > 0 && (
+                                        <div className="space-y-1">
+                                            {issues.map((issue, i) => (
+                                                <div
+                                                    key={i}
+                                                    className={`text-sm ${
+                                                        issue.severity === 'error'
+                                                            ? 'text-red-600 font-bold'
+                                                            : 'text-orange-600'
+                                                    }`}
+                                                >
+                                                    {issue.severity === 'error' ? '🚨' : '⚠️'} {issue.message}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </td>
+                            </tr>
+                        );
+                    })}
+                </tbody>
+            </table>
+            <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded">
+                <p className="text-sm text-gray-700">
+                    ⚠️ <strong>重要提醒：</strong>本計算器提供的數據與警示僅供參考，不可取代醫師評估，也非醫療建議。如有疑慮請諮詢專業醫師。
+                </p>
+            </div>
+        </div>
+    );
+};
+
+// 圖表組件
+const GrowthChart = ({ data, measurements, type, title, yAxisLabel }) => {
+    const chartRef = React.useRef(null);
+    const chartInstance = React.useRef(null);
+
+    React.useEffect(() => {
+        if (chartInstance.current) {
+            chartInstance.current.destroy();
+        }
+
+        const ctx = chartRef.current.getContext('2d');
+        
+        const measurementData = {
+            label: '實際測量',
+            data: measurements.map(m => ({ x: m.age, y: m[type] })),
+            borderColor: 'rgb(59, 130, 246)',
+            backgroundColor: 'rgb(59, 130, 246)',
+            borderWidth: 3,
+            pointRadius: 3,
+            pointHoverRadius: 4,
+            showLine: true
+        };
+
+        chartInstance.current = new Chart(ctx, {
+            type: 'scatter',
+            data: {
+                datasets: [...data.datasets, measurementData]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                aspectRatio: 4/5,
+                plugins: {
+                    filler: {
+                        propagate: false
+                    },
+                    title: {
+                        display: true,
+                        text: title,
+                        font: { size: 16, weight: 'bold' }
+                    },
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            filter: (legendItem) => {
+                                // 隱藏下界線的 legend（以 _ 開頭的隱藏）
+                                return !legendItem.text.startsWith('_');
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        type: 'linear',
+                        title: {
+                            display: true,
+                            text: '年齡（歲）',
+                            font: { size: 14 }
+                        },
+                        min: 0,
+                        max: 18,
+                        ticks: {
+                            stepSize: 1
+                        },
+                        grid: {
+                            display: true
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: yAxisLabel,
+                            font: { size: 14 }
+                        },
+                        ticks: {
+                            stepSize: type === 'height' ? 5 : 5  // 身高5cm，體重5kg
+                        },
+                        grid: {
+                            display: true
+                        }
+                    }
+                }
+            }
+        });
+
+        return () => {
+            if (chartInstance.current) {
+                chartInstance.current.destroy();
+            }
+        };
+    }, [data, measurements, type, title, yAxisLabel]);
+
+    return (
+        <div className="chart-container">
+            <canvas ref={chartRef}></canvas>
+        </div>
+    );
+};
+
+// 匯出圖片功能組件
+const ExportButtons = ({ resultsRef }) => {
+    const [exporting, setExporting] = React.useState(false);
+
+    const exportAsImage = async () => {
+        if (!resultsRef.current || exporting) return;
+        setExporting(true);
+
+        try {
+            const element = resultsRef.current;
+            const canvas = await html2canvas(element, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: '#ffffff',
+                logging: false,
+                // Chart.js canvas needs this
+                onclone: (clonedDoc) => {
+                    // Ensure charts are visible in cloned document
+                    const charts = clonedDoc.querySelectorAll('canvas');
+                    charts.forEach(chart => {
+                        chart.style.maxWidth = '100%';
+                    });
+                }
+            });
+
+            // Add branded header and footer to the canvas
+            const brandedCanvas = document.createElement('canvas');
+            const ctx = brandedCanvas.getContext('2d');
+            const headerHeight = 100;
+            const footerHeight = 80;
+
+            brandedCanvas.width = canvas.width;
+            brandedCanvas.height = canvas.height + headerHeight + footerHeight;
+
+            // White background
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, brandedCanvas.width, brandedCanvas.height);
+
+            // Header
+            ctx.fillStyle = '#1e40af';
+            ctx.fillRect(0, 0, brandedCanvas.width, headerHeight);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 36px "Noto Sans TC", sans-serif';
+            ctx.fillText('兒童生長評估報告', 40, 55);
+            ctx.font = '22px "Noto Sans TC", sans-serif';
+            ctx.fillStyle = '#bfdbfe';
+            ctx.fillText('白袍旅人｜楊為傑醫師', 40, 85);
+
+            // Main content
+            ctx.drawImage(canvas, 0, headerHeight);
+
+            // Footer
+            const footerY = headerHeight + canvas.height;
+            ctx.fillStyle = '#f0f9ff';
+            ctx.fillRect(0, footerY, brandedCanvas.width, footerHeight);
+            ctx.fillStyle = '#6b7280';
+            ctx.font = '18px "Noto Sans TC", sans-serif';
+            ctx.fillText('本報告僅供參考，不可取代醫師評估 | twkid.com', 40, footerY + 30);
+            ctx.fillText('產生日期：' + new Date().toLocaleDateString('zh-TW'), 40, footerY + 58);
+
+            // Right side of footer - LINE CTA
+            ctx.fillStyle = '#06c755';
+            ctx.font = 'bold 18px "Noto Sans TC", sans-serif';
+            const lineText = '加入 LINE 官方帳號 @a800 追蹤提醒';
+            const lineTextWidth = ctx.measureText(lineText).width;
+            ctx.fillText(lineText, brandedCanvas.width - lineTextWidth - 40, footerY + 45);
+
+            // Download
+            const link = document.createElement('a');
+            const today = new Date().toISOString().split('T')[0];
+            link.download = `生長評估報告_${today}.png`;
+            link.href = brandedCanvas.toDataURL('image/png');
+            link.click();
+        } catch (err) {
+            console.error('Export failed:', err);
+            alert('匯出失敗，請稍後再試。如果使用行動裝置，請嘗試截圖功能。');
+        } finally {
+            setExporting(false);
+        }
+    };
+
+    const shareToLine = async () => {
+        if (!resultsRef.current) return;
+
+        // Use LINE share URL scheme
+        const shareText = '我用「白袍旅人」的生長評估工具幫孩子畫了生長曲線！免費又好用，推薦給你：https://twkid.com/p/growth-curve-tool/';
+        const lineShareUrl = `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent('https://twkid.com/p/growth-curve-tool/')}&text=${encodeURIComponent(shareText)}`;
+        window.open(lineShareUrl, '_blank');
+    };
+
+    return (
+        <div className="flex flex-col sm:flex-row gap-3">
+            <button
+                onClick={exportAsImage}
+                disabled={exporting}
+                className="flex-1 flex items-center justify-center gap-2 bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+                {exporting ? (
+                    <>
+                        <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                        </svg>
+                        匯出中...
+                    </>
+                ) : (
+                    <>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                        儲存報告圖片
+                    </>
+                )}
+            </button>
+            <button
+                onClick={shareToLine}
+                className="flex-1 flex items-center justify-center gap-2 text-white py-3 px-4 rounded-lg hover:opacity-90 transition-colors font-medium"
+                style={{ backgroundColor: '#06c755' }}
+            >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.349 0 .63.285.63.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.282.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314"/>
+                </svg>
+                分享給朋友
+            </button>
+        </div>
+    );
+};
+
+// 情境化「下一步行動」CTA 組件
+const ContextualCTA = ({ warnings, results, gender }) => {
+    // 分析警訊類型
+    const allIssues = warnings.flatMap(w => w.issues);
+    const hasAnyWarning = warnings.length > 0;
+    const hasSevereIssue = allIssues.some(i => i.severity === 'error');
+    const hasGeneticDeviation = allIssues.some(i => i.type === 'genetic_deviation');
+    const hasGrowthRateIssue = allIssues.some(i => i.type === 'growth_rate');
+    const hasHeightIssue = allIssues.some(i => i.type === 'height_percentile');
+    const hasBMIIssue = allIssues.some(i => i.type === 'bmi');
+
+    // 根據問題類型建立相關文章推薦
+    const articles = [];
+    if (hasHeightIssue || hasGeneticDeviation || hasGrowthRateIssue) {
+        articles.push({ title: '長高吃什麼？蛋白質與微量營養素完整攻略', anchor: '#ch2-5' });
+        articles.push({ title: '骨齡是什麼？跟身高有什麼關係？', anchor: '#ch3-3' });
+        articles.push({ title: '怎麼預估孩子將來的身高？', anchor: '#ch3-2' });
+    }
+    if (hasBMIIssue) {
+        articles.push({ title: '兒童青少年肥胖：BMI 每增加 1，青春期提早半年', anchor: '#ch11-2' });
+        articles.push({ title: '長高的黃金作息：營養、睡眠、運動', anchor: '#ch2-5' });
+    }
+    if (hasGeneticDeviation) {
+        articles.push({ title: '性早熟與初經：什麼時候該擔心？', anchor: '#ch3-4' });
+    }
+    if (hasGrowthRateIssue && allIssues.some(i => i.type === 'growth_rate' && i.severity === 'error')) {
+        articles.push({ title: '怎麼看懂生長曲線？六大長高警訊', anchor: '#ch3-1' });
+    }
+    // 去重
+    const uniqueArticles = articles.filter((a, i, arr) => arr.findIndex(x => x.anchor === a.anchor) === i);
+
+    const articleBaseUrl = 'https://twkid.com/p/growth-curve-tool/';
+    const lineBookingUrl = 'https://line.me/R/ti/p/@a800';
+
+    // ===== 情境一：結果正常，沒有任何警訊 =====
+    if (!hasAnyWarning) {
+        return (
+            <div className="p-6 rounded-lg border-2 border-green-300 bg-green-50">
+                <div className="flex items-start gap-3">
+                    <span className="text-3xl flex-shrink-0">✅</span>
+                    <div>
+                        <h3 className="text-lg font-bold text-green-800">
+                            孩子的成長軌跡穩定，繼續保持！
+                        </h3>
+                        <p className="text-green-700 mt-2">
+                            目前各項數值都在正常範圍內。生長追蹤最重要的是<strong>持續觀察趨勢</strong>，建議每 3～6 個月回來更新一次數據。
+                        </p>
+                        <div className="mt-4 flex flex-col sm:flex-row gap-3">
+                            <button
+                                onClick={() => {
+                                    const text = '我用「白袍旅人」的免費生長曲線工具幫孩子做了評估，結果正常！推薦給你也試試：';
+                                    const url = 'https://twkid.com/p/growth-curve-tool/';
+                                    window.open(`https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`, '_blank');
+                                }}
+                                className="inline-flex items-center justify-center gap-2 text-white py-2 px-4 rounded-lg font-medium hover:opacity-90 transition-colors"
+                                style={{ backgroundColor: '#06c755' }}
+                            >
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.349 0 .63.285.63.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.282.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314"/>
+                                </svg>
+                                推薦給其他家長
+                            </button>
+                            <a
+                                href={articleBaseUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center justify-center gap-2 bg-white text-green-700 border-2 border-green-300 py-2 px-4 rounded-lg font-medium hover:bg-green-100 transition-colors"
+                            >
+                                📖 閱讀完整育兒指南
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // ===== 情境二：有嚴重警訊（紅燈）=====
+    if (hasSevereIssue) {
+        return (
+            <div className="p-6 rounded-lg border-2 border-red-300 bg-red-50">
+                <div className="flex items-start gap-3">
+                    <span className="text-3xl flex-shrink-0">🏥</span>
+                    <div className="w-full">
+                        <h3 className="text-lg font-bold text-red-800">
+                            建議帶孩子到兒科門診進一步評估
+                        </h3>
+                        <p className="text-red-700 mt-2">
+                            評估結果顯示有需要注意的項目。生長問題越早發現、越早處理，效果越好。建議安排一次兒科門診，讓醫師做更完整的評估。
+                        </p>
+
+                        <div className="mt-4 flex flex-col sm:flex-row gap-3">
+                            <a
+                                href={lineBookingUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center justify-center gap-2 text-white py-3 px-5 rounded-lg font-bold hover:opacity-90 transition-colors"
+                                style={{ backgroundColor: '#06c755' }}
+                            >
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.349 0 .63.285.63.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.282.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314"/>
+                                </svg>
+                                LINE 預約楊醫師門診（台南）
+                            </a>
+                        </div>
+
+                        <p className="text-sm text-gray-600 mt-3">
+                            不在台南地區？建議就近找兒童內分泌科或兒科生長門診評估。
+                        </p>
+
+                        {uniqueArticles.length > 0 && (
+                            <div className="mt-4 pt-4 border-t border-red-200">
+                                <p className="text-sm font-bold text-red-800 mb-2">📖 先了解更多：</p>
+                                <div className="flex flex-wrap gap-2">
+                                    {uniqueArticles.map((article, i) => (
+                                        <a
+                                            key={i}
+                                            href={articleBaseUrl + article.anchor}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-block text-sm bg-white text-red-700 border border-red-200 py-1.5 px-3 rounded-full hover:bg-red-100 transition-colors"
+                                        >
+                                            {article.title}
+                                        </a>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // ===== 情境三：輕度警訊（黃燈）=====
+    return (
+        <div className="p-6 rounded-lg border-2 border-amber-300 bg-amber-50">
+            <div className="flex items-start gap-3">
+                <span className="text-3xl flex-shrink-0">💡</span>
+                <div className="w-full">
+                    <h3 className="text-lg font-bold text-amber-800">
+                        有幾個項目需要留意
+                    </h3>
+                    <p className="text-amber-700 mt-2">
+                        目前的數據顯示有些指標值得關注，但不一定代表有問題。建議持續追蹤，如果趨勢持續偏離，可以安排門診進一步評估。
+                    </p>
+
+                    {uniqueArticles.length > 0 && (
+                        <div className="mt-4">
+                            <p className="text-sm font-bold text-amber-800 mb-2">📖 楊醫師建議你讀這幾篇：</p>
+                            <div className="flex flex-wrap gap-2">
+                                {uniqueArticles.map((article, i) => (
+                                    <a
+                                        key={i}
+                                        href={articleBaseUrl + article.anchor}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-block text-sm bg-white text-amber-700 border border-amber-200 py-1.5 px-3 rounded-full hover:bg-amber-100 transition-colors"
+                                    >
+                                        {article.title}
+                                    </a>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="mt-4 flex flex-col sm:flex-row gap-3">
+                        <a
+                            href={lineBookingUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center justify-center gap-2 text-white py-2 px-4 rounded-lg font-medium hover:opacity-90 transition-colors"
+                            style={{ backgroundColor: '#06c755' }}
+                        >
+                            想進一步評估？LINE 預約門診
+                        </a>
+                        <button
+                            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                            className="inline-flex items-center justify-center gap-2 bg-white text-amber-700 border-2 border-amber-300 py-2 px-4 rounded-lg font-medium hover:bg-amber-100 transition-colors"
+                        >
+                            ↑ 補充更多測量數據再看趨勢
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// LINE 官方帳號 CTA 組件
+const LineCTA = () => (
+    <div className="p-6 rounded-lg border-2 border-green-300" style={{ backgroundColor: '#f0fdf4' }}>
+        <div className="flex flex-col sm:flex-row items-center gap-4">
+            <div className="flex-shrink-0">
+                <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ backgroundColor: '#06c755' }}>
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="white">
+                        <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.349 0 .63.285.63.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.282.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314"/>
+                    </svg>
+                </div>
+            </div>
+            <div className="flex-1 text-center sm:text-left">
+                <h3 className="text-lg font-bold text-gray-800">
+                    定期追蹤，才能看出趨勢
+                </h3>
+                <p className="text-sm text-gray-600 mt-1">
+                    加入白袍旅人 LINE 官方帳號，我們會在該量身高的時候提醒你。還有更多實證育兒知識！
+                </p>
+            </div>
+            <a
+                href="https://line.me/R/ti/p/@a800"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-shrink-0 inline-flex items-center gap-2 text-white py-3 px-6 rounded-full hover:opacity-90 transition-colors font-bold text-base"
+                style={{ backgroundColor: '#06c755' }}
+            >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                </svg>
+                加入好友
+            </a>
+        </div>
+    </div>
+);
+
+// 主應用組件
+
+// ===================== 診間匯入 / 合理性檢查（門診優化擴充） =====================
+
+// base64url <-> UTF-8 JSON。用 hash(#d=) 傳遞，資料不會進伺服器 log。
+const encodeState = (obj) => {
+    const bytes = new TextEncoder().encode(JSON.stringify(obj));
+    let bin = '';
+    bytes.forEach(b => { bin += String.fromCharCode(b); });
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+};
+
+const decodeState = (b64) => {
+    const pad = b64.replace(/-/g, '+').replace(/_/g, '/');
+    const bin = atob(pad + '==='.slice((pad.length + 3) % 4));
+    const bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
+    return JSON.parse(new TextDecoder().decode(bytes));
+};
+
+// 把外部資料收斂成本工具的 formData 形狀，順便擋掉不認識的欄位
+const normalizeImport = (raw) => {
+    if (!raw || typeof raw !== 'object') throw new Error('資料格式不正確');
+    const str = (v) => (v === null || v === undefined) ? '' : String(v).trim();
+    const gender = str(raw.gender).toLowerCase();
+    const ms = Array.isArray(raw.measurements) ? raw.measurements : [];
+    const measurements = ms
+        .filter(m => m && (m.measureDate || m.height || m.weight))
+        .slice(0, 10)
+        .map(m => ({
+            measureDate: str(m.measureDate),
+            height: str(m.height),
+            weight: str(m.weight)
+        }));
+    return {
+        gender: (gender === 'male' || gender === 'female') ? gender : '',
+        birthDate: str(raw.birthDate),
+        fatherHeight: str(raw.fatherHeight),
+        motherHeight: str(raw.motherHeight),
+        measurements: measurements.length ? measurements
+                                          : [{ measureDate: '', height: '', weight: '' }]
+    };
+};
+
+// 跨欄位 / 跨時間的合理性檢查。
+// validateMeasurement 只看單一欄位範圍，抓不到「身高體重寫反」「身高倒退」
+// 「年增速離譜」這類 OCR 誤讀與手誤 —— 這裡補上。
+const validatePlausibility = (fd) => {
+    const issues = [];
+    const label = (i) => '測量數據 ' + (i + 1);
+
+    [['fatherHeight', '父親'], ['motherHeight', '母親']].forEach(([key, who]) => {
+        const raw = fd[key];
+        if (raw === '' || raw === null || raw === undefined) return;
+        const v = parseFloat(raw);
+        if (isNaN(v) || v < 130 || v > 220) {
+            issues.push(who + '身高 ' + raw + ' 公分不在合理範圍（130–220），請確認');
+        }
+    });
+
+    const rows = fd.measurements.map((m, i) => ({
+        i: i,
+        date: m.measureDate,
+        h: parseFloat(m.height),
+        w: parseFloat(m.weight)
+    }));
+
+    const seen = {};
+    rows.forEach(r => {
+        if (!r.date) return;
+        if (seen[r.date]) issues.push('測量日期 ' + r.date + ' 出現超過一次，請確認是否重複輸入');
+        seen[r.date] = true;
+    });
+
+    rows.forEach(r => {
+        if (isNaN(r.h) || isNaN(r.w)) return;
+        if (r.w > r.h) {
+            issues.push(label(r.i) + '：體重 ' + r.w + ' 大於身高 ' + r.h + '，身高體重是否寫反？');
+        }
+        const bmi = r.w / Math.pow(r.h / 100, 2);
+        if (bmi < 8 || bmi > 50) {
+            issues.push(label(r.i) + '：換算 BMI 為 ' + bmi.toFixed(1) +
+                        '，超出人類可能範圍（8–50），請確認身高與體重');
+        }
+    });
+
+    const sorted = rows
+        .filter(r => r.date && !isNaN(r.h) && !isNaN(r.w))
+        .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+
+    for (let k = 1; k < sorted.length; k++) {
+        const prev = sorted[k - 1];
+        const cur = sorted[k];
+        const days = (new Date(cur.date) - new Date(prev.date)) / 86400000;
+        if (days <= 0) continue;
+        const years = days / 365.25;
+
+        // 站姿量測誤差約 1 公分，超過 1.5 公分的倒退幾乎都是輸入錯誤
+        if (cur.h < prev.h - 1.5) {
+            issues.push(prev.date + ' → ' + cur.date + '：身高從 ' + prev.h +
+                        ' 降到 ' + cur.h + ' 公分，身高不會倒退，請確認');
+        }
+        if (days >= 60) {
+            const cmPerYear = (cur.h - prev.h) / years;
+            if (cmPerYear > 25) {
+                issues.push(prev.date + ' → ' + cur.date + '：身高年增速達 ' +
+                            cmPerYear.toFixed(1) + ' 公分/年，超過生理可能，請確認日期與身高');
+            }
+            const kgPerYear = Math.abs(cur.w - prev.w) / years;
+            if (kgPerYear > 30) {
+                issues.push(prev.date + ' → ' + cur.date + '：體重年變化達 ' +
+                            kgPerYear.toFixed(1) + ' 公斤/年，請確認');
+            }
+        }
+    }
+
+    return issues;
+};
+
+// 匯入面板：給診間電腦貼上 PWA 產出的 JSON，或把目前資料轉成分享連結
+const ImportPanel = ({ onImport, buildLink }) => {
+    const [open, setOpen] = React.useState(false);
+    const [text, setText] = React.useState('');
+    const [msg, setMsg] = React.useState('');
+
+    const doImport = () => {
+        try {
+            onImport(normalizeImport(JSON.parse(text)));
+            setMsg('✅ 已匯入，正在計算…');
+        } catch (e) {
+            setMsg('❌ 匯入失敗：' + e.message);
+        }
+    };
+
+    const doLink = async () => {
+        const url = buildLink();
+        try {
+            await navigator.clipboard.writeText(url);
+            setMsg('✅ 連結已複製到剪貼簿');
+        } catch (e) {
+            setText(url);
+            setMsg('連結已放到下方欄位，請手動複製');
+        }
+    };
+
+    return (
+        <div className="mb-6">
+            <button type="button" onClick={() => setOpen(!open)}
+                className="text-sm text-gray-500 hover:text-gray-700 underline">
+                {open ? '收合' : '診間工具：貼上資料匯入 / 產生分享連結'}
+            </button>
+            {open && (
+                <div className="mt-2 p-4 border rounded-lg bg-gray-50 space-y-2">
+                    <textarea
+                        value={text}
+                        onChange={(e) => setText(e.target.value)}
+                        placeholder='貼上 JSON，例如：{"gender":"male","birthDate":"2019-03-05","measurements":[{"measureDate":"2026-08-22","height":123.5,"weight":24}]}'
+                        className="w-full p-2 border rounded font-mono text-xs h-24"
+                    />
+                    <div className="flex gap-2">
+                        <button type="button" onClick={doImport}
+                            className="px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">
+                            匯入並計算
+                        </button>
+                        <button type="button" onClick={doLink}
+                            className="px-3 py-1.5 bg-gray-600 text-white rounded text-sm hover:bg-gray-700">
+                            複製目前資料的連結
+                        </button>
+                    </div>
+                    {msg && <p className="text-sm text-gray-700">{msg}</p>}
+                </div>
+            )}
+        </div>
+    );
+};
+
+// createSvgTag 會把尺寸寫死成 px，換掉根節點的 width/height 才能同一份 SVG
+// 既餵螢幕（px）又餵列印（mm）。內層的 rect/path 沒有 px 單位，不會被誤傷。
+const resizeSvgTag = (tag, size) =>
+    tag.replace(/width="[0-9]+px"/, 'width="' + size + '"')
+       .replace(/height="[0-9]+px"/, 'height="' + size + '"');
+
+// 複診免重填：把「含全部資料的連結」交給病歷註記或兒童手冊，
+// 下次點開／掃描就全部帶入，只要補當天一列。
+const RevisitPanel = ({ buildLink }) => {
+    // 每次 render 重算，連結才會跟著最新的 formData 走（不能在 mount 時快取）
+    const url = buildLink();
+    const [copied, setCopied] = React.useState(false);
+    const [showManual, setShowManual] = React.useState(false);
+    const [note, setNote] = React.useState('');
+
+    // 換了病人／改了資料之後，舊的「已複製」提示會誤導人以為手上那份是新的
+    React.useEffect(() => {
+        setCopied(false);
+        setShowManual(false);
+        setNote('');
+    }, [url]);
+
+    const svgTag = React.useMemo(() => {
+        // 離線版 vendor/ 缺檔時優雅降級，其他功能照常
+        if (typeof window.qrcode !== 'function') return null;
+        try {
+            // typeNumber 0 = 自動選型號；連結約 600–1000 字元，'M' 容錯下容量仍然夠
+            const qr = window.qrcode(0, 'M');
+            qr.addData(url);
+            qr.make();
+            return qr.createSvgTag({ cellSize: 4, margin: 4 });
+        } catch (e) {
+            return null;
+        }
+    }, [url]);
+
+    const displaySvg = React.useMemo(
+        () => (svgTag ? resizeSvgTag(svgTag, '180px') : null),
+        [svgTag]
+    );
+
+    const doCopy = async () => {
+        try {
+            await navigator.clipboard.writeText(url);
+            setCopied(true);
+            setShowManual(false);
+        } catch (e) {
+            // file:// 或非 HTTPS 下沒有 clipboard API，退回讓人自己選取
+            setCopied(false);
+            setShowManual(true);
+        }
+    };
+
+    const printSticker = () => {
+        if (!svgTag) return;
+        // 開新視窗印，而不是在主頁面加全域 @media print：
+        // 使用者可能直接 Ctrl+P 想印整份報告，加了規則會把報告蓋掉。
+        const w = window.open('', '_blank');
+        if (!w) {
+            setNote('瀏覽器擋下新視窗，請允許彈出視窗後再試一次。');
+            return;
+        }
+        const today = new Date().toLocaleDateString('zh-TW');
+        w.document.write(
+            '<!DOCTYPE html><html lang="zh-TW"><head><meta charset="utf-8">' +
+            '<title>生長曲線 QR 貼紙</title><style>' +
+            'body{margin:0;padding:10mm;text-align:center;' +
+            'font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif}' +
+            '.qr{line-height:0}' +
+            '.cap{margin-top:4mm;font-size:11pt}' +
+            '.day{margin-top:1mm;font-size:8pt;color:#666}' +
+            '</style></head><body>' +
+            // 55mm：滿版 10 筆量測時 QR 會到 121 模組，再小下去每個模組不到 0.45mm，
+            // 印在紙上手機就掃不動了
+            '<div class="qr">' + resizeSvgTag(svgTag, '55mm') + '</div>' +
+            '<div class="cap">生長曲線資料・掃描即帶入</div>' +
+            '<div class="day">' + today + '</div>' +
+            '</body></html>'
+        );
+        w.document.close();
+        w.focus();
+        w.print();
+    };
+
+    return (
+        <div className="p-4 bg-blue-50 rounded-lg">
+            <h3 className="font-bold mb-1">複診免重填</h3>
+            <p className="text-sm text-gray-700 mb-3">
+                把這個連結存進病歷註記，或把 QR 貼在兒童手冊。下次點開／掃描，所有資料自動帶入，只要補當天一列。
+            </p>
+
+            <div className="flex flex-wrap gap-2 items-center">
+                <button type="button" onClick={doCopy}
+                    className="px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">
+                    複製複診連結
+                </button>
+                {svgTag && (
+                    <button type="button" onClick={printSticker}
+                        className="px-3 py-1.5 bg-gray-600 text-white rounded text-sm hover:bg-gray-700">
+                        列印 QR 貼紙
+                    </button>
+                )}
+                {copied && <span className="text-sm text-green-700 font-medium">✅ 已複製</span>}
+            </div>
+
+            {showManual && (
+                <div className="mt-2">
+                    <p className="text-sm text-gray-700 mb-1">無法自動複製，請手動選取下方連結：</p>
+                    <input
+                        type="text"
+                        readOnly
+                        value={url}
+                        onFocus={(e) => e.target.select()}
+                        className="w-full p-2 border rounded font-mono text-xs bg-white"
+                    />
+                </div>
+            )}
+
+            {note && <p className="mt-2 text-sm text-orange-600">{note}</p>}
+
+            <div className="mt-3">
+                {displaySvg ? (
+                    <div className="inline-block bg-white p-2 rounded border"
+                        dangerouslySetInnerHTML={{ __html: displaySvg }} />
+                ) : (
+                    <p className="text-sm text-gray-500">QR 元件未載入</p>
+                )}
+            </div>
+
+            <p className="mt-3 text-xs text-gray-500">
+                若病歷欄位有字數限制（連結約 600–1000 字），請改用 QR 貼紙。
+            </p>
+        </div>
+    );
+};
+
+const GrowthCalculator = () => {
+    const [formData, setFormData] = React.useState({
+        gender: '',
+        birthDate: '',
+        fatherHeight: '',
+        motherHeight: '',
+        measurements: [{ measureDate: '', height: '', weight: '' }]
+    });
+    
+    const [results, setResults] = React.useState(null);
+    const [warnings, setWarnings] = React.useState([]);
+    const [error, setError] = React.useState('');
+    const resultsRef = React.useRef(null);
+    const formRef = React.useRef(null);
+    const overrideRef = React.useRef(false);
+    const [plausibility, setPlausibility] = React.useState([]);
+    const [runTick, setRunTick] = React.useState(0);
+    const [importNote, setImportNote] = React.useState('');
+
+    // 從網址 hash 匯入（#d=<base64url JSON>）。用 hash 而非 query string，
+    // 資料不會被送到伺服器，也不會留在 access log。
+    React.useEffect(() => {
+        const readHash = () => {
+            const m = window.location.hash.match(/(?:^#|&)d=([A-Za-z0-9_-]+)/);
+            if (!m) return;
+            try {
+                const data = normalizeImport(decodeState(m[1]));
+                setFormData(data);
+                setResults(null);
+                setWarnings([]);
+                setError('');
+                setPlausibility([]);
+                setImportNote('已從連結帶入資料，請核對後確認。');
+                setRunTick(t => t + 1);
+            } catch (e) {
+                setError('連結資料匯入失敗，請手動輸入（' + e.message + '）');
+            }
+        };
+        readHash();
+        // 同一個分頁換上新的 #d= 連結時，瀏覽器只換 fragment、不會重新載入頁面。
+        // 不聽 hashchange 的話，畫面會停留在上一位病人的資料 —— 在門診是危險的。
+        window.addEventListener('hashchange', readHash);
+        return () => window.removeEventListener('hashchange', readHash);
+    }, []);
+
+    // 匯入或「仍要計算」之後，觸發一次正式送出
+    React.useEffect(() => {
+        if (runTick > 0 && formRef.current) formRef.current.requestSubmit();
+    }, [runTick]);
+
+    const importData = (data) => {
+        setFormData(data);
+        setError('');
+        setPlausibility([]);
+        setImportNote('已匯入資料，請核對後確認。');
+        setRunTick(t => t + 1);
+    };
+
+    // 用 href 去掉 hash 當基底：file:// 下 origin 會是 "file://" 或 "null"，用 origin+pathname 會產生壞連結
+    const buildShareLink = () =>
+        window.location.href.split('#')[0] + '#d=' + encodeState(formData);
+
+
+    const addMeasurement = () => {
+        if (formData.measurements.length >= 10) {
+            setError('最多只能添加10組測量數據');
+            return;
+        }
+        setFormData({
+            ...formData,
+            measurements: [...formData.measurements, { measureDate: '', height: '', weight: '' }]
+        });
+    };
+
+    const removeMeasurement = (index) => {
+        if (formData.measurements.length === 1) {
+            setError('至少需要保留1組數據');
+            return;
+        }
+        const newMeasurements = formData.measurements.filter((_, i) => i !== index);
+        setFormData({ ...formData, measurements: newMeasurements });
+    };
+
+    const handleInputChange = (index, field, value) => {
+        const newMeasurements = [...formData.measurements];
+        newMeasurements[index] = { ...newMeasurements[index], [field]: value };
+        setFormData({ ...formData, measurements: newMeasurements });
+    };
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        setError('');
+
+        if (!formData.gender) {
+            setError('請選擇性別');
+            return;
+        }
+
+        if (!formData.birthDate) {
+            setError('請輸入出生日期');
+            return;
+        }
+
+        // 合理性檢查：有疑點就先擋下來讓人確認，確認後才放行
+        const skipPlausibility = overrideRef.current;
+        overrideRef.current = false;
+        const plausibilityIssues = validatePlausibility(formData);
+        if (plausibilityIssues.length > 0 && !skipPlausibility) {
+            setPlausibility(plausibilityIssues);
+            setResults(null);
+            return;
+        }
+        setPlausibility([]);
+
+        try {
+            const processedMeasurements = formData.measurements.map(measurement => {
+                const { measureDate, height, weight } = measurement;
+                
+                validateMeasurement(formData.birthDate, measureDate, height, weight);
+
+                const ageData = calculateAge(formData.birthDate, measureDate);
+                const age = ageData.decimalAge;
+                const bmi = calculateBMI(parseFloat(weight), parseFloat(height));
+
+                return {
+                    measureDate,
+                    age,
+                    height: parseFloat(height),
+                    weight: parseFloat(weight),
+                    bmi,
+                    displayAge: `${ageData.years}歲${ageData.months}個月`,
+                    heightPercentile: calculatePercentile(parseFloat(height), age, 'height', formData.gender),
+                    weightPercentile: calculatePercentile(parseFloat(weight), age, 'weight', formData.gender),
+                    bmiPercentile: calculatePercentile(bmi, age, 'bmi', formData.gender)
+                };
+            });
+
+            processedMeasurements.sort((a, b) => new Date(a.measureDate) - new Date(b.measureDate));
+
+            // 計算基因身高
+            let geneticHeightCurve = null;
+            let geneticHeightInfo = null;
+            let geneticHeightPercentile = null;
+            
+            if (formData.fatherHeight && formData.motherHeight) {
+                const fatherH = parseFloat(formData.fatherHeight);
+                const motherH = parseFloat(formData.motherHeight);
+                
+                if (!isNaN(fatherH) && !isNaN(motherH) && fatherH > 0 && motherH > 0) {
+                    const avgHeight = (fatherH + motherH) / 2;
+                    const expectedHeight = formData.gender === 'male' ? avgHeight + 6 : avgHeight - 6;
+
+                    // 在18歲時找出對應的百分位
+                    const percentileAt18 = calculatePercentileValue(expectedHeight, 18, formData.gender);
+                    geneticHeightPercentile = percentileAt18;
+
+                    // 生成整條基因身高曲線（中間值）
+                    geneticHeightCurve = generateHeightCurveByPercentile(percentileAt18, formData.gender);
+
+                    // ===== 用 z-score 計算正確的 ±1 SD 範圍 =====
+                    // 1. 將基因預期身高的百分位轉為 z-score
+                    const zGenetic = percentileToZscore(percentileAt18);
+                    // 2. z ± 1 得到上下界的 z-score
+                    const zUpper = zGenetic + 1;
+                    const zLower = zGenetic - 1;
+                    // 3. 轉回百分位
+                    const upperPercentile = Math.max(1, Math.min(99, zscoreToPercentile(zUpper)));
+                    const lowerPercentile = Math.max(1, Math.min(99, zscoreToPercentile(zLower)));
+                    // 4. 生成上下界曲線
+                    const geneticUpperCurve = generateHeightCurveByPercentile(upperPercentile, formData.gender);
+                    const geneticLowerCurve = generateHeightCurveByPercentile(lowerPercentile, formData.gender);
+
+                    // 把上下界附加到 geneticHeightCurve 物件上
+                    geneticHeightCurve._upper = geneticUpperCurve;
+                    geneticHeightCurve._lower = geneticLowerCurve;
+
+                    // 計算 18 歲時 ±1SD 實際對應的 cm 範圍（用於顯示）
+                    const upperHeightAt18 = geneticUpperCurve[geneticUpperCurve.length - 1].y;
+                    const lowerHeightAt18 = geneticLowerCurve[geneticLowerCurve.length - 1].y;
+                    const sdInCm = ((upperHeightAt18 - lowerHeightAt18) / 2).toFixed(1);
+
+                    geneticHeightInfo = {
+                        expectedHeight: expectedHeight.toFixed(1),
+                        percentile: percentileAt18.toFixed(1),
+                        upperPercentile: upperPercentile.toFixed(1),
+                        lowerPercentile: lowerPercentile.toFixed(1),
+                        sdInCm: sdInCm
+                    };
+                }
+            }
+
+            // 檢測異常（包含基因身高偏差檢查）
+            const detectedWarnings = detectAbnormalities(
+                processedMeasurements, 
+                formData.gender, 
+                geneticHeightPercentile
+            );
+
+            setResults({
+                measurements: processedMeasurements,
+                heightData: createChartData('height', formData.gender, geneticHeightCurve),
+                weightData: createChartData('weight', formData.gender),
+                geneticHeightInfo: geneticHeightInfo
+            });
+            
+            setWarnings(detectedWarnings);
+        } catch (err) {
+            setError(err.message);
+        }
+    };
+
+    return (
+        <div className="max-w-6xl mx-auto p-6">
+            <h1 className="text-3xl font-bold text-center mb-8">兒童生長評估計算器（含異常檢測）</h1>
+
+            <ImportPanel onImport={importData} buildLink={buildShareLink} />
+
+            {importNote && (
+                <div className="mb-4 p-3 bg-green-50 border border-green-300 text-green-800 rounded-lg text-sm">
+                    {importNote}
+                </div>
+            )}
+            
+            <form ref={formRef} onSubmit={handleSubmit} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                        <label className="block font-medium">性別：</label>
+                        <div className="flex gap-4">
+                            <label className="flex items-center cursor-pointer">
+                                <input
+                                    type="radio"
+                                    value="male"
+                                    checked={formData.gender === 'male'}
+                                    onChange={(e) => setFormData({...formData, gender: e.target.value})}
+                                    className="mr-2"
+                                />
+                                男生
+                            </label>
+                            <label className="flex items-center cursor-pointer">
+                                <input
+                                    type="radio"
+                                    value="female"
+                                    checked={formData.gender === 'female'}
+                                    onChange={(e) => setFormData({...formData, gender: e.target.value})}
+                                    className="mr-2"
+                                />
+                                女生
+                            </label>
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="block font-medium">出生日期：</label>
+                        <input
+                            type="date"
+                            value={formData.birthDate}
+                            onChange={(e) => setFormData({...formData, birthDate: e.target.value})}
+                            className="w-full p-2 border rounded"
+                        />
+                    </div>
+                </div>
+
+                {/* 父母身高區域（選填） */}
+                <div className="p-4 bg-blue-50 rounded-lg">
+                    <h3 className="font-medium mb-3">基因身高計算（選填）</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                            <label className="block font-medium">父親身高 (cm)：</label>
+                            <input
+                                type="number"
+                                step="0.1"
+                                value={formData.fatherHeight}
+                                onChange={(e) => setFormData({...formData, fatherHeight: e.target.value})}
+                                placeholder="例如：175"
+                                className="w-full p-2 border rounded"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="block font-medium">母親身高 (cm)：</label>
+                            <input
+                                type="number"
+                                step="0.1"
+                                value={formData.motherHeight}
+                                onChange={(e) => setFormData({...formData, motherHeight: e.target.value})}
+                                placeholder="例如：162"
+                                className="w-full p-2 border rounded"
+                            />
+                        </div>
+                    </div>
+                    <p className="text-sm text-gray-600 mt-2">
+                        💡 填寫父母身高後，將在身高生長曲線上顯示基因預期身高（淡藍色虛線）
+                    </p>
+                </div>
+
+                <div className="space-y-4">
+                    {formData.measurements.map((measurement, index) => (
+                        <MeasurementInput
+                            key={index}
+                            data={measurement}
+                            index={index}
+                            onChange={(field, value) => handleInputChange(index, field, value)}
+                            onRemove={() => removeMeasurement(index)}
+                            isRemovable={formData.measurements.length > 1}
+                        />
+                    ))}
+                </div>
+
+                {formData.measurements.length < 10 && (
+                    <button
+                        type="button"
+                        onClick={addMeasurement}
+                        className="flex items-center gap-2 text-blue-600 hover:text-blue-800 transition-colors"
+                    >
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" 
+                             stroke="currentColor" strokeWidth="2" 
+                             strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        添加測量數據
+                    </button>
+                )}
+
+                <button
+                    type="submit"
+                    className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 
+                             transition-colors font-medium"
+                >
+                    計算評估結果
+                </button>
+            </form>
+
+            {error && (
+                <div className="mt-4 p-4 bg-red-100 text-red-700 rounded-lg">
+                    {error}
+                </div>
+            )}
+
+            {plausibility.length > 0 && (
+                <div className="mt-4 p-4 bg-amber-50 border-2 border-amber-400 rounded-lg">
+                    <h3 className="font-bold text-amber-900 mb-2">
+                        ⚠️ 資料看起來有問題，請先確認
+                    </h3>
+                    <ul className="list-disc list-inside text-amber-900 space-y-1 text-sm">
+                        {plausibility.map((issue, i) => <li key={i}>{issue}</li>)}
+                    </ul>
+                    <p className="text-xs text-amber-800 mt-3">
+                        這些是常見的輸入錯誤或辨識誤讀。請回上方修正；
+                        若確認資料無誤（例如久未回診、量測方式改變），可直接繼續。
+                    </p>
+                    <button
+                        type="button"
+                        onClick={() => { overrideRef.current = true; setRunTick(t => t + 1); }}
+                        className="mt-3 px-4 py-2 bg-amber-600 text-white rounded hover:bg-amber-700 text-sm"
+                    >
+                        我已確認資料無誤，仍要計算
+                    </button>
+                </div>
+            )}
+
+            {results && (
+                <div className="mt-8 space-y-8">
+                    {/* 匯出按鈕列 */}
+                    <ExportButtons resultsRef={resultsRef} />
+
+                    {/* 複診免重填：連結 + QR 貼紙。放在 resultsRef 外面，
+                        才不會被 html2canvas 一起截進報告圖裡。 */}
+                    <RevisitPanel buildLink={buildShareLink} />
+
+                    {/* 可匯出的結果區塊 */}
+                    <div ref={resultsRef} className="space-y-8 bg-white p-2">
+                    {warnings.length > 0 && (
+                        <div className="p-6 bg-red-50 border-2 border-red-300 rounded-lg">
+                            <h3 className="text-xl font-bold text-red-700 mb-4">⚠️ 發現異常狀況</h3>
+                            <div className="space-y-4">
+                                {warnings.map((warning, index) => (
+                                    <div key={index} className="bg-white p-4 rounded border border-red-200">
+                                        <div className="font-bold text-red-700 mb-2">
+                                            {warning.displayAge} ({formatDate(warning.measureDate)})
+                                        </div>
+                                        <ul className="space-y-1">
+                                            {warning.issues.map((issue, i) => (
+                                                <li
+                                                    key={i}
+                                                    className={`${
+                                                        issue.severity === 'error'
+                                                            ? 'text-red-600 font-bold'
+                                                            : 'text-orange-600'
+                                                    }`}
+                                                >
+                                                    {issue.severity === 'error' ? '🚨' : '⚠️'} {issue.message}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    
+                    {/* 基因身高資訊 */}
+                    {results.geneticHeightInfo && (
+                        <div className="p-6 bg-blue-50 border-2 border-blue-300 rounded-lg">
+                            <h3 className="text-xl font-bold text-blue-700 mb-4">🧬 基因預期身高</h3>
+                            <div className="bg-white p-4 rounded">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <span className="text-gray-600">預期身高（18歲）：</span>
+                                        <span className="text-2xl font-bold text-blue-700 ml-2">
+                                            {results.geneticHeightInfo.expectedHeight} ± {results.geneticHeightInfo.sdInCm} cm
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <span className="text-gray-600">對應百分位：</span>
+                                        <span className="text-2xl font-bold text-blue-700 ml-2">
+                                            {results.geneticHeightInfo.percentile}%
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="mt-3 p-3 bg-blue-50 rounded text-sm text-gray-700">
+                                    <p>
+                                        💡 圖表中的<strong>藍色虛線</strong>為基因預期身高，
+                                        <strong>淡藍色範圍帶</strong>為 ±1 個標準差
+                                        （18 歲時約 ±{results.geneticHeightInfo.sdInCm} cm，
+                                        對應百分位 P{results.geneticHeightInfo.lowerPercentile} ~ P{results.geneticHeightInfo.upperPercentile}）
+                                    </p>
+                                </div>
+                                <p className="text-sm text-orange-600 font-medium mt-2">
+                                    ⚠️ 此乃推估值，僅供參考
+                                </p>
+                            </div>
+                        </div>
+                    )}
+                    
+                    <ResultsTable results={results} warnings={warnings} />
+                    
+                    <GrowthChart
+                        data={results.heightData}
+                        measurements={results.measurements}
+                        type="height"
+                        title="身高生長曲線"
+                        yAxisLabel="身高 (cm)"
+                    />
+                    
+                    <GrowthChart
+                        data={results.weightData}
+                        measurements={results.measurements}
+                        type="weight"
+                        title="體重生長曲線"
+                        yAxisLabel="體重 (kg)"
+                    />
+
+                    <div className="p-4 bg-blue-50 rounded-lg">
+                        <h3 className="font-bold mb-2">評估說明：</h3>
+                        <ul className="list-disc list-inside space-y-1">
+                            <li>百分位數值代表在同年齡同性別群體中的相對位置</li>
+                            <li><span className="text-red-600 font-bold">異常標準（紅燈）：</span></li>
+                            <ul className="list-disc list-inside ml-6 space-y-1">
+                                <li>身高或體重 &lt;3% 或 &gt;97%</li>
+                                <li>每年生長速度 &lt;4公分</li>
+                                <li>BMI &gt;97% (肥胖)</li>
+                            </ul>
+                            <li><span className="text-orange-600 font-bold">需注意（黃燈）：</span></li>
+                            <ul className="list-disc list-inside ml-6 space-y-1">
+                                <li>4歲後，青春期前生長過快（男生12歲前、女生10歲前每年&gt;6公分）</li>
+                                <li>BMI 85-97% (過重)</li>
+                            </ul>
+                            <li>第3-15百分位：略低</li>
+                            <li>第15-85百分位：正常範圍</li>
+                            <li>第85-97百分位：略高</li>
+                        </ul>
+                    </div>
+                    {/* 情境化「下一步行動」CTA */}
+                    <ContextualCTA
+                        warnings={warnings}
+                        results={results}
+                        gender={formData.gender}
+                    />
+
+                    </div>{/* end of resultsRef */}
+
+                    {/* LINE 官方帳號導流 CTA */}
+                    <LineCTA />
+
+                    {/* 再次顯示匯出按鈕（結果很長時方便底部使用） */}
+                    <ExportButtons resultsRef={resultsRef} />
+                </div>
+            )}
+        </div>
+    );
+};
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<GrowthCalculator />);
+
+    </script>
+</body>
+</html>

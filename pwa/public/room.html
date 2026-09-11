@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>診間清單 — 生長曲線</title>
+<style>
+  * { box-sizing:border-box; }
+  html,body { margin:0; background:#f4f4f5; color:#18181b;
+    font-family:-apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif; }
+  .wrap { max-width:820px; margin:0 auto; padding:20px 16px 48px; }
+  header { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:6px; }
+  h1 { font-size:22px; margin:0; }
+  .hint { color:#71717a; font-size:13px; line-height:1.7; }
+  .banner { border-radius:11px; padding:12px 14px; font-size:14px; line-height:1.65; margin:12px 0; }
+  .banner.warn { background:#fffbeb; border:1.5px solid #f59e0b; color:#78350f; }
+  .banner.err { background:#fef2f2; border:1.5px solid #ef4444; color:#7f1d1d; }
+  ul { list-style:none; margin:16px 0 0; padding:0; }
+  li { background:#fff; border:1px solid #d4d4d8; border-radius:13px; margin-bottom:10px;
+       display:flex; align-items:center; gap:14px; padding:14px 16px; }
+  .seq { font-size:26px; font-weight:800; min-width:64px; font-variant-numeric:tabular-nums; }
+  .meta { flex:1; min-width:0; font-size:14px; line-height:1.6; }
+  .meta b { font-size:15px; }
+  .meta small { color:#71717a; }
+  .go { background:#1d4ed8; color:#fff; border:none; border-radius:10px;
+        padding:12px 18px; font-size:15px; font-weight:700; cursor:pointer; white-space:nowrap; }
+  .rm { background:none; border:none; color:#a1a1aa; font-size:17px; cursor:pointer; padding:8px; }
+  .empty { text-align:center; color:#71717a; padding:48px 0; font-size:15px; }
+  .bar { display:flex; gap:8px; align-items:center; }
+  .bar button { background:#fff; border:1px solid #d4d4d8; border-radius:9px;
+                padding:8px 12px; font-size:13px; cursor:pointer; font-weight:600; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>診間清單</h1>
+    <div class="bar">
+      <button id="refresh">重新整理</button>
+      <button id="cfg">⚙︎</button>
+    </div>
+  </header>
+  <p class="hint">護理師拍照建檔後會出現在這裡，點「開啟曲線」直接畫圖。資料 30 分鐘後自動刪除。每 10 秒自動更新。</p>
+  <div id="msg"></div>
+  <ul id="list"></ul>
+  <div class="empty" id="empty">目前沒有待處理的資料</div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const LS = { key:'clinicKey', tool:'growthToolUrl' };
+  const DEFAULT_TOOL = '/tool.html';  // 內建改造版；twkid 版更新後可改回線上網址
+
+  const m = location.hash.match(/(?:^#|&)k=([^&]+)/);
+  if (m) { localStorage.setItem(LS.key, decodeURIComponent(m[1])); history.replaceState(null,'',location.pathname); }
+
+  const getKey = () => localStorage.getItem(LS.key) || '';
+  const getTool = () => localStorage.getItem(LS.tool) || DEFAULT_TOOL;
+  const banner = (cls, html) => { $('msg').innerHTML = html ? `<div class="banner ${cls}">${html}</div>` : ''; };
+
+  $('cfg').onclick = () => {
+    const k = prompt('診所密鑰：', getKey());
+    if (k !== null) localStorage.setItem(LS.key, k.trim());
+    const t = prompt('生長曲線工具網址：', getTool());
+    if (t !== null) localStorage.setItem(LS.tool, t.trim() || DEFAULT_TOOL);
+    load();
+  };
+
+  function encodeState(obj) {
+    const bytes = new TextEncoder().encode(JSON.stringify(obj));
+    let bin = ''; bytes.forEach(b => { bin += String.fromCharCode(b); });
+    return btoa(bin).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  }
+
+  const age = (birth, at) => {
+    const b = new Date(birth), d = new Date(at);
+    let y = d.getFullYear() - b.getFullYear();
+    let mo = d.getMonth() - b.getMonth();
+    if (d.getDate() < b.getDate()) mo--;
+    if (mo < 0) { y--; mo += 12; }
+    return `${y}歲${mo}個月`;
+  };
+
+  function render(items) {
+    const ul = $('list'); ul.innerHTML = '';
+    $('empty').style.display = items.length ? 'none' : 'block';
+
+    items.forEach(item => {
+      const d = item.data;
+      const last = d.measurements[d.measurements.length - 1] || {};
+      const li = document.createElement('li');
+
+      const seq = document.createElement('div');
+      seq.className = 'seq'; seq.textContent = d.seq || '—';
+
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      meta.innerHTML =
+        `<b>${d.gender === 'male' ? '男' : '女'}　${last.measureDate ? age(d.birthDate, last.measureDate) : ''}</b><br>` +
+        `${last.height ?? '?'} cm　${last.weight ?? '?'} kg　` +
+        `<small>${d.measurements.length} 筆紀錄・` +
+        `${new Date(item.createdAt).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})} 建檔</small>`;
+
+      const go = document.createElement('button');
+      go.className = 'go'; go.textContent = '開啟曲線';
+      go.onclick = () => {
+        const { seq: _s, ...form } = d;
+        window.open(getTool() + '#d=' + encodeState(form), '_blank', 'noopener');
+      };
+
+      const rm = document.createElement('button');
+      rm.className = 'rm'; rm.textContent = '✕'; rm.title = '從清單移除';
+      rm.onclick = async () => {
+        await fetch('/api/queue?id=' + item.id, { method:'DELETE', headers:{'x-clinic-key':getKey()} });
+        load();
+      };
+
+      li.append(seq, meta, go, rm);
+      ul.appendChild(li);
+    });
+  }
+
+  async function load() {
+    const hasKey = !!getKey();
+    try {
+      // 內網模式下不帶密鑰呼叫；501（佇列未啟用）或 200 都照常處理，不因沒密鑰就擋住
+      const r = await fetch('/api/queue', hasKey ? { headers: { 'x-clinic-key': getKey() } } : {});
+      if (r.status === 401) {
+        banner('warn', hasKey ? '診所密鑰不正確，請按 ⚙︎ 重新設定。' : '尚未設定診所密鑰，請按右上角 ⚙︎ 設定。');
+        return;
+      }
+      const j = await r.json();
+      if (r.status === 501) { banner('warn', j.error + '。請改用拍照端的「直接開啟曲線」。'); return; }
+      if (!r.ok) throw new Error(j.error || `伺服器回應 ${r.status}`);
+      banner('', '');
+      render(j.items || []);
+    } catch (e) {
+      banner('err', '讀取失敗：' + e.message);
+    }
+  }
+
+  $('refresh').onclick = load;
+  load();
+  setInterval(load, 10000);
+})();
+</script>
+</body>
+</html>

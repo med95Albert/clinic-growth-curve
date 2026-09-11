@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>兒童生長曲線 資料填寫單（A4 列印）</title>
+<style>
+  @page { size: A4 portrait; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #f0f0f0; }
+  body { font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif; color: #000; }
+
+  .sheet {
+    position: relative;
+    width: 210mm; height: 297mm;
+    margin: 8mm auto; padding: 12mm 14mm;
+    background: #fff;
+    box-shadow: 0 0 6px rgba(0,0,0,.25);
+  }
+
+  /* 四角定位標記：讓程式做透視校正、切格用。請勿移除或遮住。
+     用 SVG fill 而不是 CSS background —— 瀏覽器列印預設不印背景圖形，背景畫的方塊會整個消失。
+     距紙邊 8mm，避開多數印表機 4–5mm 的不可列印區。 */
+  .reg { position: absolute; width: 7mm; height: 7mm; display: block; }
+  .reg.tl { top: 8mm;  left: 8mm; }
+  .reg.tr { top: 8mm;  right: 8mm; }
+  .reg.bl { bottom: 8mm; left: 8mm; }
+  .reg.br { bottom: 8mm; right: 8mm; }
+  /* 右上角下方另一個 3mm 小方塊，用來判斷照片有沒有上下顛倒 */
+  .reg-dot { position: absolute; top: 17mm; right: 8mm; width: 3mm; height: 3mm; display: block; }
+  /* 灰底與表頭底色屬裝飾，能印就印；印不出也不影響辨識 */
+  .bx.pre, th, tr.today td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  h1 { font-size: 15pt; margin: 0 0 1mm 6mm; letter-spacing: 1px; }  /* 左推 6mm：避開左上定位塊 */
+  .sub { font-size: 8.5pt; color: #333; margin: 0 0 3mm 6mm; }
+
+  .howto {
+    border: 1.2pt solid #000; padding: 1.6mm 3mm; margin-bottom: 3mm;
+    font-size: 8.5pt; line-height: 1.5;
+  }
+  .howto b { font-size: 9pt; }
+
+  .sec { margin-bottom: 3.8mm; }
+  .sec-h {
+    font-size: 11pt; font-weight: 700;
+    border-left: 3pt solid #000; padding-left: 2mm; margin-bottom: 2mm;
+  }
+
+  .row { display: flex; align-items: center; gap: 2mm; flex-wrap: wrap; }
+  .lbl { font-size: 11pt; font-weight: 700; }
+  .unit { font-size: 10pt; }
+
+  /* 數字格 */
+  .boxes { display: inline-flex; gap: 0; }
+  .bx {
+    width: 7.5mm; height: 10mm;
+    border: 0.9pt solid #000; border-right: none;
+    display: inline-block;
+  }
+  .boxes .bx:last-child { border-right: 0.9pt solid #000; }
+  .bx.pre {
+    background: #e8e8e8; font-size: 11pt; text-align: center;
+    line-height: 10mm; color: #555;
+  }
+  .dot {
+    width: 4.5mm; text-align: center; font-size: 22pt; line-height: 10mm;
+    font-weight: 900; display: inline-block; vertical-align: top;
+  }
+  .boxes { vertical-align: top; }
+
+  .tick {
+    display: inline-block; width: 7mm; height: 7mm;
+    border: 1.3pt solid #000; margin-right: 2mm; vertical-align: -1.6mm;
+  }
+  .tick-lbl { font-size: 12pt; margin-right: 10mm; font-weight: 700; }
+
+  table { border-collapse: collapse; width: 100%; }
+  th, td { border: 0.9pt solid #000; padding: 1.1mm 1mm; text-align: center;
+         vertical-align: middle; white-space: nowrap; }
+  th { font-size: 9pt; background: #eee; padding: 1.4mm 1mm; }
+  td.n { width: 10mm; font-size: 11pt; font-weight: 800; }
+  tr.today td { background: #f2f2f2; }
+  tr.today td.n { font-size: 7.5pt; }
+
+  .seqbox { border: 1.4pt solid #000; padding: 1.5mm 2mm; display: inline-flex; align-items: center; gap: 2mm; }
+
+  .foot { position: absolute; bottom: 13mm; left: 20mm; right: 20mm; font-size: 7.5pt; color: #333; line-height: 1.5; }  /* 左右各縮 6mm：避開下方定位塊 */
+  .foot hr { border: none; border-top: 0.7pt solid #999; margin: 0 0 1.5mm; }
+
+  @media print {
+    html, body { background: #fff; }
+    .sheet { margin: 0; box-shadow: none; }
+    .noprint { display: none; }
+  }
+  .noprint {
+    max-width: 210mm; margin: 6mm auto 0; padding: 3mm 4mm;
+    background: #fffbe6; border: 1px solid #e0c060; font-size: 12px; line-height: 1.7;
+  }
+</style>
+</head>
+<body>
+
+<div class="sheet">
+  <svg class="reg tl" viewBox="0 0 10 10" aria-hidden="true"><rect width="10" height="10" fill="#000"/></svg><svg class="reg tr" viewBox="0 0 10 10" aria-hidden="true"><rect width="10" height="10" fill="#000"/></svg>
+  <svg class="reg bl" viewBox="0 0 10 10" aria-hidden="true"><rect width="10" height="10" fill="#000"/></svg><svg class="reg br" viewBox="0 0 10 10" aria-hidden="true"><rect width="10" height="10" fill="#000"/></svg>
+  <svg class="reg-dot" viewBox="0 0 10 10" aria-hidden="true"><rect width="10" height="10" fill="#000"/></svg>
+
+  <h1>兒童生長曲線　資料填寫單</h1>
+  <p class="sub">請家長填寫，交回櫃檯即可。本單不會留下姓名，僅供繪製生長曲線使用。</p>
+
+  <div class="howto">
+    <b>填寫方式</b>：請用櫃檯提供的<b>黑色粗筆（0.7mm 以上）</b>，數字<b>一格寫一個</b>，寫滿格子中央、不要超出框線。<br>
+    寫錯請<b>整格塗黑</b>後在旁邊重寫，<b>不要用立可白／立可帶</b>。年份請填<b>民國年</b>。
+  </div>
+
+  <div class="sec">
+    <div class="row" style="justify-content: space-between;">
+      <div class="seqbox">
+        <span class="lbl">病歷號</span>
+        <span class="boxes"><i class="bx"></i><i class="bx"></i><i class="bx"></i><i class="bx"></i><i class="bx"></i><i class="bx"></i><i class="bx"></i><i class="bx"></i></span>
+        <span class="unit" style="color:#666;">（櫃檯填寫）</span>
+      </div>
+      <div>
+        <span class="lbl" style="margin-right:3mm;">性別</span>
+        <span class="tick"></span><span class="tick-lbl">男生</span>
+        <span class="tick"></span><span class="tick-lbl">女生</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-h">一、孩子的出生日期（必填）</div>
+    <div class="row">
+      <span class="lbl">民國</span>
+      <span class="boxes"><i class="bx"></i><i class="bx"></i><i class="bx"></i></span>
+      <span class="unit">年</span>
+      <span class="boxes"><i class="bx"></i><i class="bx"></i></span>
+      <span class="unit">月</span>
+      <span class="boxes"><i class="bx"></i><i class="bx"></i></span>
+      <span class="unit">日</span>
+      <span class="unit" style="color:#666; margin-left:3mm;">例：民國 <b>108</b> 年 <b>03</b> 月 <b>05</b> 日</span>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-h">二、父母身高（選填，但填了可以算出孩子的遺傳預期身高）</div>
+    <div class="row">
+      <span class="lbl">爸爸</span>
+      <span class="boxes"><i class="bx"></i><i class="bx"></i><i class="bx"></i></span>
+      <span class="unit">公分</span>
+      <span style="width:8mm;"></span>
+      <span class="lbl">媽媽</span>
+      <span class="boxes"><i class="bx"></i><i class="bx"></i><i class="bx"></i></span>
+      <span class="unit">公分</span>
+      <span class="unit" style="color:#666; margin-left:3mm;">不知道可以空白</span>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-h">三、身高體重紀錄（最少填一列；有兒童手冊或學校紀錄可多填，最多 9 列歷史）</div>
+    <table>
+      <thead>
+        <tr>
+          <th></th>
+          <th style="width:74mm;">量測日期（民國年）</th>
+          <th style="width:40mm;">身高（公分）<br><span style="font-weight:400;font-size:8pt;">例 1 2 3 . 5</span></th>
+          <th style="width:40mm;">體重（公斤）<br><span style="font-weight:400;font-size:8pt;">例 0 2 4 . 0</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- 9 列歷史 + 1 列今日；10 列＝曲線工具的上限 -->
+        <tr>
+          <td class="n">1</td>
+          <td><span class="boxes"><i class="bx pre">1</i><i class="bx"></i><i class="bx"></i></span><span class="unit">年</span><span class="boxes"><i class="bx"></i><i class="bx"></i></span><span class="unit">月</span><span class="boxes"><i class="bx"></i><i class="bx"></i></span><span class="unit">日</span></td>
+          <td><span class="boxes"><i class="bx"></i><i class="bx"></i><i class="bx"></i></span><span class="dot">.</span><span class="boxes"><i class="bx"></i></span></td>
+          <td><span class="boxes"><i class="bx"></i><i class="bx"></i><i class="bx"></i></span><span class="dot">.</span><span class="boxes"><i class="bx"></i></span></td>
+        </tr>
+        <tr>
+          <td class="n">2</td>
+          <td><span class="boxes"><i class="bx pre">1</i><i class="bx"></i><i class="bx"></i></span><span class="unit">年</span><span class="boxes"><i class="bx"></i><i class="bx"></i></span><span class="unit">月</span><span class="boxes"><i class="bx"></i><i class="bx"></i></span><span class="unit">日</span></td>
+          <td><span class="boxes"><i class="bx"></i><i class="bx"></i><i class="bx"></i></span><span class="dot">.</span><span class="boxes"><i class="bx"></i></span></td>
+          <td><span class="boxes"><i class="bx"></i><i class="bx"></i><i class="bx"></i></span><span class="dot">.</span><span class="boxes"><i class="bx"></i></span></td>
+        </tr>
+        <tr>
+          <td class="n">3</td>
+          <td><span class="boxes"><i class="bx pre">1</i><i class="bx"></i><i class="bx"></i></span><span class="unit">年</span><span class="boxes"><i class="bx"></i><i class="bx"></i></span><span class="unit">月</span><span class="boxes"><i class="bx"></i><i class="bx"></i></span><span class="unit">日</span></td>
+          <td><span class="boxes"><i class="bx"></i><i class="bx"></i><i class="bx"></i></span><span class="dot">.</span><span class="boxes"><i class="bx"></i></span></td>
+          <td><span class="boxes"><i class="bx"></i><i class="bx"></i><i class="bx"></i></span><span class="dot">.</span><span class="boxes"><i class="bx"></i></span></td>
+        </tr>
+        <tr>
+          <td class="n">4</td>
+          <td><span class="boxes"><i class="bx pre">1</i><i class="bx"></i><i class="bx"></i></span><span class="unit">年</span><span class="boxes"><i class="bx"></i><i class="bx"></i></span><span class="unit">月</span><span class="boxes"><i class="bx"></i><i class="bx"></i></span><span class="unit">日</span></td>
+          <td><span class="boxes"><i class="bx"></i><i class="bx"></i><i class="bx"></i></span><span class="dot">.</span><span class="boxes"><i class="bx"></i></span></td>
+          <td><span class="boxes"><i class="bx"></i><i class="bx"></i><i class="bx"></i></span><span class="dot">.</span><span class="boxes"><i class="bx"></i></span></td>
+        </tr>
+        <tr>
+          <td class="n">5</td>
+          <td><span class="boxes"><i class="bx pre">1</i><i class="bx"></i><i class="bx"></i></span><span class="unit">年</span><span class="boxes"><i class="bx"></i><i class="bx"></i></span><span class="unit">月</span><span class="boxes"><i class="bx"></i><i class="bx"></i></span><span class="unit">日</span></td>
+          <td><span class="boxes"><i class="bx"></i><i class="bx"></i><i class="bx"></i></span><span class="dot">.</span><span class="boxes"><i class="bx"></i></span></td>
+          <td><span class="boxes"><i class="bx"></i><i class="bx"></i><i class="bx"></i></span><span class="dot">.</span><span class="boxes"><i class="bx"></i></span></td>
+        </tr>
+        <tr>
+          <td class="n">6</td>
+          <td><span class="boxes"><i class="bx pre">1</i><i class="bx"></i><i class="bx"></i></span><span class="unit">年</span><span class="boxes"><i class="bx"></i><i class="bx"></i></span><span class="unit">月</span><span class="boxes"><i class="bx"></i><i class="bx"></i></span><span class="unit">日</span></td>
+          <td><span class="boxes"><i class="bx"></i><i class="bx"></i><i class="bx"></i></span><span class="dot">.</span><span class="boxes"><i class="bx"></i></span></td>
+          <td><span class="boxes"><i class="bx"></i><i class="bx"></i><i class="bx"></i></span><span class="dot">.</span><span class="boxes"><i class="bx"></i></span></td>
+        </tr>
+        <tr>
+          <td class="n">7</td>
+          <td><span class="boxes"><i class="bx pre">1</i><i class="bx"></i><i class="bx"></i></span><span class="unit">年</span><span class="boxes"><i class="bx"></i><i class="bx"></i></span><span class="unit">月</span><span class="boxes"><i class="bx"></i><i class="bx"></i></span><span class="unit">日</span></td>
+          <td><span class="boxes"><i class="bx"></i><i class="bx"></i><i class="bx"></i></span><span class="dot">.</span><span class="boxes"><i class="bx"></i></span></td>
+          <td><span class="boxes"><i class="bx"></i><i class="bx"></i><i class="bx"></i></span><span class="dot">.</span><span class="boxes"><i class="bx"></i></span></td>
+        </tr>
+        <tr>
+          <td class="n">8</td>
+          <td><span class="boxes"><i class="bx pre">1</i><i class="bx"></i><i class="bx"></i></span><span class="unit">年</span><span class="boxes"><i class="bx"></i><i class="bx"></i></span><span class="unit">月</span><span class="boxes"><i class="bx"></i><i class="bx"></i></span><span class="unit">日</span></td>
+          <td><span class="boxes"><i class="bx"></i><i class="bx"></i><i class="bx"></i></span><span class="dot">.</span><span class="boxes"><i class="bx"></i></span></td>
+          <td><span class="boxes"><i class="bx"></i><i class="bx"></i><i class="bx"></i></span><span class="dot">.</span><span class="boxes"><i class="bx"></i></span></td>
+        </tr>
+        <tr>
+          <td class="n">9</td>
+          <td><span class="boxes"><i class="bx pre">1</i><i class="bx"></i><i class="bx"></i></span><span class="unit">年</span><span class="boxes"><i class="bx"></i><i class="bx"></i></span><span class="unit">月</span><span class="boxes"><i class="bx"></i><i class="bx"></i></span><span class="unit">日</span></td>
+          <td><span class="boxes"><i class="bx"></i><i class="bx"></i><i class="bx"></i></span><span class="dot">.</span><span class="boxes"><i class="bx"></i></span></td>
+          <td><span class="boxes"><i class="bx"></i><i class="bx"></i><i class="bx"></i></span><span class="dot">.</span><span class="boxes"><i class="bx"></i></span></td>
+        </tr>
+        <tr class="today">
+          <td class="n">今日<br>量測</td>
+          <td><span class="boxes"><i class="bx pre">1</i><i class="bx"></i><i class="bx"></i></span><span class="unit">年</span><span class="boxes"><i class="bx"></i><i class="bx"></i></span><span class="unit">月</span><span class="boxes"><i class="bx"></i><i class="bx"></i></span><span class="unit">日</span></td>
+          <td><span class="boxes"><i class="bx"></i><i class="bx"></i><i class="bx"></i></span><span class="dot">.</span><span class="boxes"><i class="bx"></i></span></td>
+          <td><span class="boxes"><i class="bx"></i><i class="bx"></i><i class="bx"></i></span><span class="dot">.</span><span class="boxes"><i class="bx"></i></span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="foot">
+    <hr>
+    本單僅蒐集病歷號、出生日期、性別、身高、體重與父母身高，<b>不含姓名、身分證號或聯絡方式</b>，用於繪製兒童生長曲線並於當次看診解說。
+    曲線結果僅供參考，不可取代醫師評估。
+  </div>
+</div>
+
+<div class="noprint">
+  <b>列印方式</b>：Ctrl / ⌘ + P → 紙張 A4、邊界「無」、關閉「頁首及頁尾」、縮放 100%（不要選「符合頁面大小」，會讓格子尺寸跑掉）。<br>
+  <b>拍攝台設定</b>：把表單放在桌面畫好的框內，裝置固定在支架上俯拍，確保<b>四個角的黑方塊都完整入鏡</b>。右上角的黑方塊下方多一個小方塊，是用來判斷照片方向的。
+</div>
+
+</body>
+</html>

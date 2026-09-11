@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1d4ed8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="生長曲線建檔">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<title>生長曲線建檔</title>
+<style>
+  :root {
+    --blue:#1d4ed8; --blue-d:#1e40af; --amber:#b45309; --amber-bg:#fffbeb;
+    --line:#d4d4d8; --ink:#18181b; --muted:#71717a; --ok:#15803d;
+  }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; background:#f4f4f5; color:var(--ink);
+    font-family:-apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif; }
+  body { padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
+  .wrap { max-width:1100px; margin:0 auto; padding:12px 14px 40px; }
+
+  header { display:flex; align-items:center; justify-content:space-between; padding:10px 0 14px; }
+  header h1 { font-size:19px; margin:0; }
+  .gear { background:none; border:none; font-size:22px; padding:4px 8px; cursor:pointer; }
+
+  .btn { display:block; width:100%; border:none; border-radius:14px; padding:18px;
+    font-size:19px; font-weight:700; cursor:pointer; }
+  .btn-main { background:var(--blue); color:#fff; }
+  .btn-main:active { background:var(--blue-d); }
+  .btn-sub { background:#fff; color:var(--blue); border:2px solid var(--blue); }
+  .btn-ghost { background:#fff; color:var(--muted); border:1px solid var(--line); font-size:15px; padding:12px; font-weight:600; }
+  .btn:disabled { opacity:.5; }
+  .btn + .btn { margin-top:10px; }
+
+  .card { background:#fff; border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:14px; }
+  .hint { color:var(--muted); font-size:13px; line-height:1.7; }
+
+  .grid { display:grid; gap:14px; grid-template-columns:1fr; }
+  @media (min-width:820px) { .grid { grid-template-columns:minmax(0,40%) minmax(0,60%); align-items:start; } }
+
+  .shot { width:100%; border-radius:10px; display:block; border:1px solid var(--line);
+    cursor:zoom-in; background:#fafafa; object-fit:contain;
+    /* 窄螢幕先壓低，讓欄位留在畫面內；要細看就點開放大 */
+    max-height:30vh; }
+  @media (min-width:820px) {
+    .shot { max-height:none; }
+    /* 寬螢幕讓照片跟著捲動，核對到最後一列時仍看得到原圖 */
+    .grid > div:first-child { position:sticky; top:12px; }
+  }
+
+  .field { display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid #f0f0f0; }
+  .field:last-child { border-bottom:none; }
+  .field label { width:88px; flex:none; font-size:14px; font-weight:600; color:#3f3f46; }
+  .field input, .field select {
+    flex:1; min-width:0; font-size:21px; font-weight:700; padding:9px 10px;
+    border:1.5px solid var(--line); border-radius:9px; background:#fff; color:var(--ink);
+    font-variant-numeric:tabular-nums;
+  }
+  .field .u { font-size:14px; color:var(--muted); flex:none; }
+  .field.warn input, .field.warn select { border-color:#f59e0b; background:var(--amber-bg); }
+  .field.warn label::after { content:" ⚠"; color:var(--amber); }
+  .field input:invalid { border-color:#dc2626; }
+
+  table.ms { width:100%; border-collapse:collapse; margin-top:6px; }
+  table.ms th { font-size:12px; color:var(--muted); font-weight:600; text-align:left; padding:4px 4px; }
+  table.ms td { padding:3px 3px; }
+  table.ms input { width:100%; font-size:18px; font-weight:700; padding:8px 6px;
+    border:1.5px solid var(--line); border-radius:8px; font-variant-numeric:tabular-nums; }
+  table.ms td.w input { border-color:#f59e0b; background:var(--amber-bg); }
+  table.ms .del { background:none; border:none; color:#dc2626; font-size:17px; cursor:pointer; padding:6px; }
+
+  .banner { border-radius:11px; padding:12px 14px; font-size:14px; line-height:1.65; margin-bottom:12px; }
+  .banner.warn { background:var(--amber-bg); border:1.5px solid #f59e0b; color:#78350f; }
+  .banner.err  { background:#fef2f2; border:1.5px solid #ef4444; color:#7f1d1d; }
+  .banner.ok   { background:#f0fdf4; border:1.5px solid #22c55e; color:#14532d; }
+
+  .spin { display:flex; flex-direction:column; align-items:center; gap:14px; padding:44px 0; }
+  .spin div.d { width:38px; height:38px; border:4px solid #e4e4e7; border-top-color:var(--blue);
+    border-radius:50%; animation:r .8s linear infinite; }
+  @keyframes r { to { transform:rotate(360deg); } }
+
+  #zoom { position:fixed; inset:0; background:rgba(0,0,0,.92); display:none;
+    align-items:center; justify-content:center; z-index:50; }
+  #zoom img { max-width:100%; max-height:100%; }
+  .hide { display:none !important; }
+  h2.sec { font-size:15px; margin:18px 0 4px; color:#3f3f46; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>生長曲線建檔</h1>
+    <button class="gear" id="gear" title="設定">⚙︎</button>
+  </header>
+
+  <!-- 設定 -->
+  <section id="setup" class="card hide">
+    <h2 style="margin-top:0;font-size:16px;">設定</h2>
+    <p class="hint">診所密鑰只需輸入一次，會存在這台裝置上。密鑰請向管理者索取，或從診所的專用網址開啟本頁自動帶入。</p>
+    <div class="field"><label>診所密鑰</label><input id="key" type="password" autocomplete="off"></div>
+    <div class="field"><label>曲線工具</label><input id="toolUrl" type="url" placeholder="https://twkid.com/tool/Growth_Curve_Tool.html"></div>
+    <div class="field"><label>上傳解析度</label>
+      <select id="edge"><option value="1600">1600px（省流量）</option><option value="2400">2400px（建議）</option><option value="3000">3000px（最清晰）</option></select>
+    </div>
+    <button class="btn btn-main" id="saveCfg" style="margin-top:12px;">儲存</button>
+    <button class="btn btn-ghost" id="closeCfg">關閉</button>
+  </section>
+
+  <!-- 首頁 -->
+  <section id="home">
+    <div id="homeMsg"></div>
+    <div class="card">
+      <p class="hint" style="margin-top:0;">把填寫單放進桌面的框內，四個角的黑方塊都要入鏡，然後按下方按鈕拍照。</p>
+      <label class="btn btn-main" for="file" style="text-align:center;">📷　拍照建檔</label>
+      <input id="file" type="file" accept="image/*" capture="environment" class="hide">
+      <label class="btn btn-sub" for="pick" style="text-align:center;">從相簿選擇</label>
+      <input id="pick" type="file" accept="image/*" class="hide">
+    </div>
+    <a class="btn btn-ghost" href="/room.html" style="text-align:center;text-decoration:none;">開啟診間清單</a>
+  </section>
+
+  <!-- 辨識中 -->
+  <section id="loading" class="card hide">
+    <div class="spin"><div class="d"></div><p class="hint" id="loadMsg">辨識中，約需 5–15 秒…</p></div>
+  </section>
+
+  <!-- 核對 -->
+  <section id="review" class="hide">
+    <div id="revMsg"></div>
+    <p class="hint" id="backendInfo" style="margin:0 0 10px;"></p>
+    <div class="grid">
+      <div class="card">
+        <p class="hint" style="margin:0 0 8px;">點照片可放大比對</p>
+        <img id="shot" class="shot" alt="拍攝的填寫單">
+      </div>
+      <div>
+        <div class="card">
+          <div class="field"><label>病歷號</label><input id="f-seq" inputmode="numeric"><span class="u"></span></div>
+          <div class="field"><label>性別</label>
+            <select id="f-gender"><option value="">— 請選擇 —</option><option value="male">男生</option><option value="female">女生</option></select>
+          </div>
+          <div class="field"><label>出生日期</label><input id="f-birth" type="date"></div>
+          <div class="field"><label>父親身高</label><input id="f-fh" type="number" step="0.1" inputmode="decimal"><span class="u">cm</span></div>
+          <div class="field"><label>母親身高</label><input id="f-mh" type="number" step="0.1" inputmode="decimal"><span class="u">cm</span></div>
+
+          <h2 class="sec">身高體重紀錄</h2>
+          <table class="ms">
+            <thead><tr><th style="width:38%">日期</th><th style="width:26%">身高 cm</th><th style="width:26%">體重 kg</th><th></th></tr></thead>
+            <tbody id="msBody"></tbody>
+          </table>
+          <button class="btn btn-ghost" id="addRow" style="margin-top:8px;">＋ 新增一列</button>
+        </div>
+
+        <button class="btn btn-main" id="send">✓　確認，送到診間</button>
+        <button class="btn btn-sub" id="open">直接開啟曲線</button>
+        <button class="btn btn-ghost" id="again">重拍</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 完成 -->
+  <section id="done" class="hide">
+    <div class="banner ok" id="doneMsg"></div>
+    <button class="btn btn-main" id="next">下一位</button>
+    <a class="btn btn-ghost" href="/room.html" style="text-align:center;text-decoration:none;">開啟診間清單</a>
+  </section>
+
+</div>
+
+<div id="zoom"><img alt="放大檢視"></div>
+
+<script>
+(() => {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const LS = { key: 'clinicKey', tool: 'growthToolUrl', edge: 'uploadEdge' };
+  // 伺服器把表單校正成 8 px/mm（A4 高 297mm ≈ 2376px）；長邊 2400 切格才不用放大，手寫細筆畫才保得住
+  const DEFAULT_EDGE = 2400;
+  const DEFAULT_TOOL = '/tool.html';  // 內建改造版；twkid 版更新後可改回線上網址
+
+  let shotDataUrl = null;
+  let queueEnabled = false;
+  let uncertain = new Set();
+  let authRequired = true;  // v2 內網模式：由 /api/config 回應校正；預設沿用 v1（需要密鑰）
+  let pilotEnabled = false; // 試用留底：伺服器設了 PILOT_DIR 才會是 true
+  let ocrId = null;         // 這張照片的留底 id，確認後要回傳同一個 id 才配得起來
+
+  // ---------- 設定 ----------
+  // 從網址 #k=... 帶入密鑰後立刻清掉 hash，避免留在畫面或歷史紀錄上
+  (function bootstrapKey() {
+    const m = location.hash.match(/(?:^#|&)k=([^&]+)/);
+    if (m) {
+      localStorage.setItem(LS.key, decodeURIComponent(m[1]));
+      history.replaceState(null, '', location.pathname);
+    }
+  })();
+
+  const getKey = () => localStorage.getItem(LS.key) || '';
+  const getTool = () => localStorage.getItem(LS.tool) || DEFAULT_TOOL;
+  const getEdge = () => Number(localStorage.getItem(LS.edge)) || DEFAULT_EDGE;
+
+  const show = (...ids) => {
+    ['home', 'loading', 'review', 'done'].forEach((s) => $(s).classList.add('hide'));
+    ids.forEach((i) => $(i).classList.remove('hide'));
+  };
+
+  const banner = (el, cls, html) => { el.innerHTML = html ? `<div class="banner ${cls}">${html}</div>` : ''; };
+
+  $('gear').onclick = () => {
+    $('key').value = getKey();
+    $('toolUrl').value = getTool();
+    $('edge').value = String(getEdge());
+    $('setup').classList.toggle('hide');
+  };
+  $('closeCfg').onclick = () => $('setup').classList.add('hide');
+  $('saveCfg').onclick = () => {
+    localStorage.setItem(LS.key, $('key').value.trim());
+    localStorage.setItem(LS.tool, $('toolUrl').value.trim() || DEFAULT_TOOL);
+    localStorage.setItem(LS.edge, $('edge').value);
+    $('setup').classList.add('hide');
+    banner($('homeMsg'), 'ok', '設定已儲存');
+    loadConfig();
+  };
+
+  async function loadConfig() {
+    const hasKey = !!getKey();
+    try {
+      // 內網模式下不帶密鑰呼叫：伺服器若不驗證會直接回 200
+      const r = await fetch('/api/config', hasKey ? { headers: { 'x-clinic-key': getKey() } } : {});
+      if (r.status === 401) {
+        authRequired = true;
+        banner($('homeMsg'), hasKey ? 'err' : 'warn',
+          hasKey ? '診所密鑰不正確，請按 ⚙︎ 重新設定。' : '尚未設定診所密鑰，請按右上角 ⚙︎ 設定。');
+        return;
+      }
+      const c = await r.json();
+      // 內網模式判定：回應明講 authRequired:false，或沒帶密鑰時仍回 200 又沒帶這個欄位
+      authRequired = c.authRequired === false ? false
+        : (!hasKey && typeof c.authRequired === 'undefined') ? false
+        : true;
+      queueEnabled = !!c.queueEnabled;
+      pilotEnabled = !!c.pilot;
+      if (!localStorage.getItem(LS.tool) && c.growthToolUrl) localStorage.setItem(LS.tool, c.growthToolUrl);
+      if (!hasKey && authRequired) {
+        banner($('homeMsg'), 'warn', '尚未設定診所密鑰，請按右上角 ⚙︎ 設定。');
+        return;
+      }
+      banner($('homeMsg'), 'ok', queueEnabled ? '' : '');
+      if (!queueEnabled) banner($('homeMsg'), 'warn', '診間佇列未啟用（伺服器未接 Redis），確認後請用「直接開啟曲線」。');
+    } catch (e) {
+      // 離線時：已知內網模式或已有密鑰就沿用本機設定；否則維持保守提示
+      if (!hasKey && authRequired) banner($('homeMsg'), 'warn', '尚未設定診所密鑰，請按右上角 ⚙︎ 設定。');
+    }
+  }
+
+  // ---------- 影像壓縮 ----------
+  // 4MB 的原始照片壓到約 300KB，診所 WiFi 不穩時這是能不能用的差別
+  function compress(file, maxEdge = getEdge(), quality = 0.85) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const scale = Math.min(1, maxEdge / Math.max(img.width, img.height));
+        const c = document.createElement('canvas');
+        c.width = Math.round(img.width * scale);
+        c.height = Math.round(img.height * scale);
+        const ctx = c.getContext('2d');
+        ctx.drawImage(img, 0, 0, c.width, c.height);
+        resolve(c.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('無法讀取影像')); };
+      img.src = url;
+    });
+  }
+
+  // ---------- 拍照 → 辨識 ----------
+  const onFile = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!getKey() && authRequired) { banner($('homeMsg'), 'err', '請先按 ⚙︎ 設定診所密鑰。'); return; }
+
+    ocrId = null;
+    show('loading');
+    try {
+      shotDataUrl = await compress(file);
+      const kb = Math.round((shotDataUrl.length * 3) / 4 / 1024);
+      $('loadMsg').textContent = `辨識中（影像 ${kb} KB），約需 5–15 秒…`;
+
+      const r = await fetch('/api/ocr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-clinic-key': getKey() },
+        body: JSON.stringify({ image: shotDataUrl, today: new Date().toISOString().slice(0, 10) }),
+      });
+      const j = await r.json();
+      ocrId = (j && j.id) || null;
+      if (!r.ok) throw new Error(j.error || `伺服器回應 ${r.status}`);
+      renderReview(j.data, { backend: j.backend, ms: j.ms });
+    } catch (err) {
+      show('home');
+      banner($('homeMsg'), 'err', '辨識失敗：' + err.message + '<br>可以重拍一次，或直接手動輸入。');
+    }
+  };
+  $('file').onchange = onFile;
+  $('pick').onchange = onFile;
+
+  // ---------- 核對畫面 ----------
+  function markWarn(fieldEl, path) {
+    fieldEl.classList.toggle('warn', uncertain.has(path));
+  }
+
+  function msRow(m, idx) {
+    const tr = document.createElement('tr');
+    const cell = (val, type, path, step) => {
+      const td = document.createElement('td');
+      const inp = document.createElement('input');
+      inp.type = type; inp.value = val ?? '';
+      if (step) { inp.step = step; inp.inputMode = 'decimal'; }
+      inp.dataset.path = path;
+      td.appendChild(inp);
+      if (uncertain.has(path)) td.classList.add('w');
+      return td;
+    };
+    tr.appendChild(cell(m.measureDate, 'date', `measurements[${idx}].measureDate`));
+    tr.appendChild(cell(m.height, 'number', `measurements[${idx}].height`, '0.1'));
+    tr.appendChild(cell(m.weight, 'number', `measurements[${idx}].weight`, '0.1'));
+    const td = document.createElement('td');
+    const b = document.createElement('button');
+    b.className = 'del'; b.textContent = '✕'; b.title = '刪除這列';
+    b.onclick = () => tr.remove();
+    td.appendChild(b); tr.appendChild(td);
+    return tr;
+  }
+
+  function renderReview(d, meta) {
+    uncertain = new Set(d.uncertain || []);
+    $('shot').src = shotDataUrl;
+
+    const infoBits = [];
+    if (meta && meta.backend) infoBits.push(`辨識後端：${meta.backend}`);
+    if (meta && typeof meta.ms === 'number') infoBits.push(`耗時 ${meta.ms} ms`);
+    $('backendInfo').textContent = infoBits.join('　');
+
+    $('f-seq').value = d.seq ?? '';
+    $('f-gender').value = d.gender ?? '';
+    $('f-birth').value = d.birthDate ?? '';
+    $('f-fh').value = d.fatherHeight ?? '';
+    $('f-mh').value = d.motherHeight ?? '';
+
+    [['f-seq', 'seq'], ['f-gender', 'gender'], ['f-birth', 'birthDate'],
+     ['f-fh', 'fatherHeight'], ['f-mh', 'motherHeight']]
+      .forEach(([id, path]) => markWarn($(id).closest('.field'), path));
+
+    const body = $('msBody');
+    body.innerHTML = '';
+    const rows = (d.measurements || []).length ? d.measurements : [{}];
+    rows.forEach((m, i) => body.appendChild(msRow(m, i)));
+
+    const bits = [];
+    if (uncertain.size) bits.push(`有 <b>${uncertain.size}</b> 個欄位辨識不確定（黃色框），請對照照片確認。`);
+    if (d.notes) bits.push(d.notes);
+    banner($('revMsg'), uncertain.size ? 'warn' : 'ok',
+      bits.length ? bits.join('<br>') : '所有欄位都判讀成功，請快速核對一次。');
+
+    show('review');
+    window.scrollTo(0, 0);
+  }
+
+  $('addRow').onclick = () => $('msBody').appendChild(msRow({}, $('msBody').children.length));
+  $('again').onclick = () => { show('home'); banner($('homeMsg'), '', ''); };
+  $('shot').onclick = () => { $('zoom').querySelector('img').src = shotDataUrl; $('zoom').style.display = 'flex'; };
+  $('zoom').onclick = () => { $('zoom').style.display = 'none'; };
+
+  // ---------- 收集 / 送出 ----------
+  function collect() {
+    const num = (v) => (v === '' ? null : Number(v));
+    const measurements = [...$('msBody').querySelectorAll('tr')].map((tr) => {
+      const [d, h, w] = tr.querySelectorAll('input');
+      return { measureDate: d.value || null, height: num(h.value), weight: num(w.value) };
+    }).filter((m) => m.measureDate || m.height !== null || m.weight !== null);
+
+    return {
+      seq: $('f-seq').value.trim() || null,
+      gender: $('f-gender').value || null,
+      birthDate: $('f-birth').value || null,
+      fatherHeight: num($('f-fh').value),
+      motherHeight: num($('f-mh').value),
+      measurements,
+    };
+  }
+
+  function validate(d) {
+    const errs = [];
+    if (!d.gender) errs.push('請選擇性別');
+    if (!d.birthDate) errs.push('請填寫出生日期');
+    if (!d.measurements.length) errs.push('至少需要一列身高體重');
+    d.measurements.forEach((m, i) => {
+      const n = i + 1;
+      if (!m.measureDate) errs.push(`第 ${n} 列缺少日期`);
+      if (m.height === null || m.weight === null) errs.push(`第 ${n} 列身高或體重未填`);
+      else if (m.weight > m.height) errs.push(`第 ${n} 列體重大於身高，是否寫反？`);
+    });
+    return errs;
+  }
+
+  // 試用留底：把護理師確認後的最終值配回同一個 id，試用本身就成了 benchmark 資料。
+  // 一律 fire-and-forget——留底失敗不該擋住看曲線，所以不 await、也不給使用者任何提示。
+  function pilotConfirm(d) {
+    if (!pilotEnabled || !ocrId) return;
+    try {
+      fetch('/api/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-clinic-key': getKey() },
+        body: JSON.stringify({ id: ocrId, data: d }),
+        keepalive: true,  // 送出後馬上開新分頁，請求要能自己跑完
+      }).catch((e) => console.warn('試用留底失敗', e));
+    } catch (e) {
+      console.warn('試用留底失敗', e);
+    }
+  }
+
+  // 與曲線工具相同的 base64url 編碼；資料放在 hash，不會送到伺服器
+  function encodeState(obj) {
+    const bytes = new TextEncoder().encode(JSON.stringify(obj));
+    let bin = ''; bytes.forEach((b) => { bin += String.fromCharCode(b); });
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  const toolLink = (d) => {
+    const { seq, ...form } = d;
+    return getTool() + '#d=' + encodeState(form);
+  };
+
+  $('open').onclick = () => {
+    const d = collect();
+    const errs = validate(d);
+    if (errs.length) { banner($('revMsg'), 'err', errs.join('<br>')); window.scrollTo(0, 0); return; }
+    pilotConfirm(d);
+    window.open(toolLink(d), '_blank', 'noopener');
+  };
+
+  $('send').onclick = async () => {
+    const d = collect();
+    const errs = validate(d);
+    if (errs.length) { banner($('revMsg'), 'err', errs.join('<br>')); window.scrollTo(0, 0); return; }
+
+    pilotConfirm(d);
+    if (!queueEnabled) {
+      window.open(toolLink(d), '_blank', 'noopener');
+      return;
+    }
+    $('send').disabled = true;
+    try {
+      const r = await fetch('/api/queue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-clinic-key': getKey() },
+        body: JSON.stringify({ data: d }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || `伺服器回應 ${r.status}`);
+      $('doneMsg').innerHTML =
+        `已送到診間清單。<br>病歷號 <b>${d.seq || '（未填）'}</b>，代碼 <b>${j.id}</b>。<br>` +
+        `資料 30 分鐘後自動刪除。`;
+      shotDataUrl = null;
+      show('done');
+    } catch (err) {
+      banner($('revMsg'), 'err', '送出失敗：' + err.message);
+      window.scrollTo(0, 0);
+    } finally {
+      $('send').disabled = false;
+    }
+  };
+
+  $('next').onclick = () => { show('home'); banner($('homeMsg'), '', ''); };
+
+  // ---------- 啟動 ----------
+  show('home');
+  loadConfig();
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+})();
+</script>
+</body>
+</html>

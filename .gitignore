@@ -1,0 +1,21 @@
+# 病人資料：實拍表單、標註、試用留底——永遠不進 repo
+bench/
+pilot/
+*.jpg
+*.jpeg
+!pwa/public/icon-*.png
+
+# 環境與快取
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store
+node_modules/
+
+# 部署殘留與秘密
+pwa/.vercel/
+.env
+.env.*
+!.env.example
+*.lock.tmp

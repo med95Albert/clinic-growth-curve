@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>掃描加入 — 生長曲線建檔</title>
+<script src="/vendor/qrcode.min.js"></script>
+<style>
+  body { margin:0; background:#f4f4f5; color:#18181b; font-family:-apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif; text-align:center; padding:32px 16px; }
+  h1 { font-size:24px; margin:0 0 6px; }
+  .url { font-size:22px; font-weight:700; font-variant-numeric:tabular-nums; margin:10px 0 18px; word-break:break-all; }
+  .qr { display:inline-block; background:#fff; padding:16px; border-radius:16px; border:1px solid #d4d4d8; line-height:0; }
+  .warn { background:#fef2f2; border:1.5px solid #ef4444; color:#7f1d1d; border-radius:11px; padding:12px 14px; margin:18px auto; max-width:560px; font-size:15px; line-height:1.6; }
+  ol { text-align:left; max-width:560px; margin:22px auto 0; font-size:15px; line-height:1.9; color:#3f3f46; }
+  a { color:#1d4ed8; }
+</style>
+</head>
+<body>
+  <h1>生長曲線建檔　手機加入方式</h1>
+  <div class="url" id="url"></div>
+  <div class="qr" id="qr"></div>
+  <div class="warn" id="warn" hidden>這頁是用 localhost 開的，QR 掃出來手機連不到。請在瀏覽器改用伺服器的區網 IP 開啟這頁（例如 http://192.168.1.21:8790/qr.html）。</div>
+  <ol>
+    <li>手機連上診所員工 Wi-Fi。</li>
+    <li>相機對準 QR，點開連結。</li>
+    <li>iPhone：Safari 分享 → 加入主畫面。Android：Chrome 選單 → 加到主畫面。</li>
+    <li>之後點主畫面圖示就能拍照建檔。診間電腦請用 <a href="/room.html">診間清單</a>。</li>
+  </ol>
+<script>
+(() => {
+  const origin = location.origin + '/';
+  document.getElementById('url').textContent = origin;
+  const host = location.hostname;
+  // 用 localhost 開這頁時 QR 會編到 localhost，手機掃了連不到，明講而不是讓人納悶
+  if (host === 'localhost' || host === '127.0.0.1') document.getElementById('warn').hidden = false;
+  if (typeof qrcode === 'function') {
+    const q = qrcode(0, 'M'); q.addData(origin); q.make();
+    document.getElementById('qr').innerHTML = q.createSvgTag({ cellSize: 7, margin: 2 });
+  } else {
+    document.getElementById('qr').textContent = 'QR 元件未載入';
+  }
+})();
+</script>
+</body>
+</html>
