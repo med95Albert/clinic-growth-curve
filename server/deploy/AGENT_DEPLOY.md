@@ -40,6 +40,11 @@ Python 3.12 venv、啟動 .bat、「啟動」資料夾捷徑開機自啟。照�
 ## Step 0｜取得程式
 
 **A. 有 GitHub（正常路徑）**
+repo 目前是**私有**的，clone 之前要先讓這台機器登入 Albert 的 GitHub 帳號一次（device flow：指令會給一組代碼，請人類在瀏覽器輸入並核准）：
+```bash
+gh auth login --hostname github.com --git-protocol https --web
+```
+沒有 `gh` 指令就先裝（需 UAC）：`winget install -e --id GitHub.cli`，裝完開新的終端機再登入。登入後：
 ```bash
 git clone https://github.com/med95Albert/clinic-growth-curve "C:/GrowthCurve"
 ```

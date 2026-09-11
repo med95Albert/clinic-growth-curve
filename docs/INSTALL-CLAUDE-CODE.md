@@ -7,7 +7,7 @@
 | 誰 | 做什麼 |
 |---|---|
 | Albert（Mac） | `gh auth login` 後建 repo 並 push（見下方「發佈」） |
-| 診所伺服器（.21 那台常開的 Windows） | 裝好 Claude Code（它會要求 Git for Windows）；有 Python 3.12 更好，沒有的話 agent 會請你允許 UAC 用 winget 裝 |
+| 診所伺服器（常開的那台 Windows） | 裝好 Claude Code（它會要求 Git for Windows）；有 Python 3.12 更好，沒有的話 agent 會請你允許 UAC 用 winget 裝。**repo 是私有的**：agent 會先跑 `gh auth login`，你在瀏覽器輸入它給的代碼核准一次即可（要公開就不用這步：`gh repo edit med95Albert/clinic-growth-curve --visibility public`） |
 | 網路 | 伺服器連線設定檔要是「私人」網路；安裝當下要能連外網一次（下載套件與 140MB 模型），之後可離線 |
 
 ## 一句指令（貼進診所伺服器的 Claude Code）
@@ -42,4 +42,4 @@ gh auth login
 cd "/Users/albertm1pro/Desktop/AI skill/生長門診優化" && gh repo create clinic-growth-curve --private --source=. --push
 ```
 
-要公開（像照片整理專案一樣）就把 `--private` 換成 `--public`。repo 已排除 `bench/`（實拍照片）、`pilot/`（試用留底）與所有 `.env`，不含任何病人資料；文件內只有私有網段 IP。
+repo 已建立為私有；要改公開（像照片整理專案一樣，診所端免登入）：`gh repo edit med95Albert/clinic-growth-curve --visibility public --accept-visibility-change-consequences`。repo 已排除 `bench/`（實拍照片）、`pilot/`（試用留底）與所有 `.env`，不含任何病人資料；文件內只有私有網段 IP。
